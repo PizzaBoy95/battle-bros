@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { socketManager } from '../network/SocketManager.js';
 import { audioSystem } from '../systems/AudioSystem.js';
+import { threeManager } from '../systems/ThreeManager.js';
 
 export class MainMenuScene extends Phaser.Scene {
   constructor() { super('MainMenu'); }
@@ -14,10 +15,17 @@ export class MainMenuScene extends Phaser.Scene {
     this.trophies = Number(localStorage.getItem('bb_trophies') || 1219);
     this.gems     = Number(localStorage.getItem('bb_gems')     || 300);
 
-    this._drawBackground();
+    // Start Three.js 3D castle behind this transparent Phaser canvas
+    const threeWrap = document.getElementById('three-wrap');
+    if (threeWrap) threeManager.init(threeWrap);
+
+    // Dark strip for top resource bar readability
+    const topG = this.add.graphics();
+    topG.fillStyle(0x000000, 0.55); topG.fillRect(0, 0, W, 58);
+    topG.lineStyle(1, 0x0A6A4E, 0.5); topG.lineBetween(0, 58, W, 58);
+
     this._drawTopBar();
     this._drawProfileRow();
-    this._drawCastleArena();
     this._drawChestRow();
     this._drawBattleBar();
     this._drawNavBar();
@@ -32,38 +40,7 @@ export class MainMenuScene extends Phaser.Scene {
     audioSystem.playTrack('battle_hymn');
   }
 
-  // ── BACKGROUND ────────────────────────────────────────────────────────────
-  _drawBackground() {
-    const { W, H } = this;
-    const g = this.add.graphics();
-
-    // Deep teal base
-    g.fillStyle(0x0E5A46); g.fillRect(0, 0, W, H);
-
-    // Radial-ish glow center (castle area)
-    g.fillStyle(0x1A7A5E, 0.6); g.fillEllipse(W / 2, H * 0.42, W * 1.1, H * 0.55);
-    g.fillStyle(0x22906E, 0.3); g.fillEllipse(W / 2, H * 0.42, W * 0.7, H * 0.38);
-
-    // Diamond quilted grid
-    const S = 44, tG = this.add.graphics();
-    tG.lineStyle(1.2, 0x0A4A38, 0.85);
-    for (let i = -H - S; i < W + H + S; i += S) {
-      tG.lineBetween(i, 0, i + H * 2, H * 2);
-      tG.lineBetween(i + H * 2, 0, i, H * 2);
-    }
-    // Subtle second grid offset for "stitch" depth
-    const tG2 = this.add.graphics();
-    tG2.lineStyle(0.5, 0x2AA880, 0.20);
-    for (let i = -H - S + 2; i < W + H + S; i += S) {
-      tG2.lineBetween(i, 0, i + H * 2, H * 2);
-      tG2.lineBetween(i + H * 2, 0, i, H * 2);
-    }
-
-    // Dark top strip for resource bar
-    const topG = this.add.graphics();
-    topG.fillStyle(0x000000, 0.62); topG.fillRect(0, 0, W, 58);
-    topG.lineStyle(1, 0x0A6A4E, 0.5); topG.lineBetween(0, 58, W, 58);
-  }
+  // Background is now provided by Three.js — see ThreeManager.js
 
   // ── TOP RESOURCE BAR ──────────────────────────────────────────────────────
   _drawTopBar() {
@@ -185,8 +162,8 @@ export class MainMenuScene extends Phaser.Scene {
     }
   }
 
-  // ── CASTLE ARENA ─────────────────────────────────────────────────────────
-  _drawCastleArena() {
+  // ── CASTLE ARENA (replaced by Three.js 3D scene) ─────────────────────────
+  _drawCastleArena_UNUSED() {
     const { W, H } = this;
     const cx = W / 2, cy = H * 0.42;
 
@@ -689,5 +666,9 @@ export class MainMenuScene extends Phaser.Scene {
 
   _fmt(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
 
-  shutdown() { socketManager.offAll('friend_invite'); this._hideInvite(); }
+  shutdown() {
+    threeManager.destroy();
+    socketManager.offAll('friend_invite');
+    this._hideInvite();
+  }
 }

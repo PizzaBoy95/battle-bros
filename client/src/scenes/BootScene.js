@@ -6,16 +6,25 @@ export class BootScene extends Phaser.Scene {
   constructor() { super('Boot'); }
 
   preload() {
-    // Nothing to load externally — all assets are procedural
-    // Show fake progress and hide loading overlay
+    // Attempt to load character portrait sprites from public/assets/characters/
+    // Silently skip any that don't exist — game falls back to procedural drawing
+    const charIds = [
+      'titan_grunt','pyro_drake','lady_vex','bone_shard','iron_bro',
+      'stone_golem','thunder_chief','blaze_witch','wing_knight','frostborn',
+      'jade_monk','sea_crusher','crystal_sage','arrow_jack','shadow_rogue',
+      'skywing','volt_ranger','toxin_toad','neon_wraith','forge_dwarf'
+    ];
+    for (const id of charIds) {
+      this.load.image(id, `assets/characters/${id}.png`);
+    }
+
+    // Suppress console errors for missing optional assets
+    this.load.on('loaderror', () => {});
+
+    // Progress bar
     const bar = document.getElementById('lbar');
     if (bar) {
-      let pct = 0;
-      const id = setInterval(() => {
-        pct = Math.min(100, pct + 20);
-        bar.style.width = pct + '%';
-        if (pct >= 100) clearInterval(id);
-      }, 60);
+      this.load.on('progress', (v) => { bar.style.width = (v * 100) + '%'; });
     }
   }
 
