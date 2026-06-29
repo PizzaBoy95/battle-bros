@@ -72,11 +72,29 @@ export class LobbyScene extends Phaser.Scene {
       this._onMatchStart(data);
     });
 
-    // Join queue (or start instant CPU game)
-    if (this.battleMode === 'vs_cpu') {
-      this.statusText.setText('Preparing CPU battle...');
+    // Bot modes — skip matchmaking entirely, start immediately
+    if (this.battleMode === 'bot' || this.battleMode === 'vs_cpu') {
+      this.statusText.setText('Setting up CPU match...');
       this.modeLabel.setText('MODE: VS CPU  🤖');
-      socketManager.playVsCpu(this.deck);
+      this.dotsText.setText('');
+      this.time.delayedCall(800, () => {
+        this._startBotMatch({ mode:'bot', players:[
+          { username: this.registry.get('username')||'You' },
+          { username: '🤖 Bot' }
+        ]});
+      });
+    } else if (this.battleMode === '2v2_bot') {
+      this.statusText.setText('Assembling your team...');
+      this.modeLabel.setText('MODE: 2v2 vs BOT  🤖');
+      this.dotsText.setText('');
+      this.time.delayedCall(1000, () => {
+        this._startBotMatch({ mode:'2v2_bot', players:[
+          { username: this.registry.get('username')||'You' },
+          { username: '🤖 Ally Bot' },
+          { username: '🤖 Enemy 1' },
+          { username: '🤖 Enemy 2' }
+        ]});
+      });
     } else {
       socketManager.joinQueue(this.deck, this.battleMode);
     }
@@ -99,6 +117,25 @@ export class LobbyScene extends Phaser.Scene {
       this.spinner.fillStyle(0x8E44AD, alpha);
       this.spinner.fillCircle(x, y, 4 - i * 0.3);
     }
+  }
+
+  _startBotMatch(data) {
+    const botData = {
+      ...data,
+      roomId: 'bot_' + Date.now(),
+      isBotMatch: true,
+      deck: this.deck,
+    };
+    this.statusText.setText(data.mode === '2v2_bot' ? 'Team ready!\n🤖 Ally + 2 Enemies' : 'Match ready!\nVS 🤖 Bot');
+    this.statusText.setStyle({ fill:'#FFD700' });
+    audioSystem.playDeploy();
+    this.time.delayedCall(900, () => {
+      this.cameras.main.fadeOut(400, 0, 0, 0);
+      this.cameras.main.once('camerafadeoutcomplete', () => {
+        this.registry.set('matchInfo', botData);
+        this.scene.start('Battle', { matchInfo: botData, deck: this.deck });
+      });
+    });
   }
 
   _onMatchStart(data) {

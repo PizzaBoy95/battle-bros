@@ -43,7 +43,6 @@ export class MainMenuScene extends Phaser.Scene {
     hud.lineStyle(1, 0x1a3a6a, 0.6); hud.lineBetween(0, 60, W, 60);
 
     this._drawTopBar();
-    this._drawProfileRow();
     this._drawBattleBar();
     this._drawNavBar();
     this._buildOverlays();
@@ -285,7 +284,7 @@ export class MainMenuScene extends Phaser.Scene {
     g.fillStyle(0xFFD700); g.fillRect(12,7,12,10); g.fillRect(14,17,8,4); g.fillRect(11,20,14,3);
     const aG = this.add.graphics().setDepth(12);
     aG.fillStyle(0x1A44BB); aG.fillRoundedRect(36,5,26,19,4);
-    this.add.text(49,14,'14',{fontSize:'11px',fill:'#FFFFFF',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5).setDepth(13);
+    this.add.text(49,14,'1',{fontSize:'11px',fill:'#FFFFFF',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5).setDepth(13);
     this.add.text(65,12,String(this.trophies),{fontSize:'17px',fill:'#FFFFFF',fontFamily:'Arial',fontStyle:'bold'}).setDepth(12);
     const xpG = this.add.graphics().setDepth(12);
     xpG.fillStyle(0x000000,0.7); xpG.fillRoundedRect(36,28,100,9,3);
@@ -326,7 +325,7 @@ export class MainMenuScene extends Phaser.Scene {
 
   _drawBattleBar() {
     const { W, H } = this;
-    const rowY = H * 0.195;
+    const rowY = H * 0.083;
     const bg = this.add.graphics().setDepth(11);
     bg.fillStyle(0x000000,0.52); bg.fillRoundedRect(8,rowY,W-16,130,12);
     bg.lineStyle(1,0x2a5a3a,0.45); bg.strokeRoundedRect(8,rowY,W-16,130,12);
@@ -574,15 +573,22 @@ export class MainMenuScene extends Phaser.Scene {
     const clBg = this.add.graphics();
     clBg.fillStyle(0x0a1e30,0.9); clBg.fillRoundedRect(12,58,W-24,110,10);
     clBg.lineStyle(2,0xFFD700,0.6); clBg.strokeRoundedRect(12,58,W-24,110,10);
+    const castleLvl = Number(localStorage.getItem('bb_castle_level') || 1);
+    const castleXp  = Number(localStorage.getItem('bb_castle_xp')    || 420);
+    const XP_TABLE  = [500,1500,4000,10000,25000,60000,150000,400000,Infinity];
+    const xpNeeded  = XP_TABLE[Math.min(castleLvl-1, XP_TABLE.length-1)];
+    const xpPct     = Math.min(castleXp / xpNeeded, 1);
+
     const clTitle = this.add.text(W/2,74,'CASTLE LEVEL',{fontSize:'12px',fill:'#FFD700',fontFamily:'Arial',letterSpacing:2}).setOrigin(0.5);
-    const clNum = this.add.text(W/2,105,'14',{fontSize:'52px',fill:'#FFFFFF',fontFamily:'Arial Black',fontStyle:'bold',stroke:'#FFD700',strokeThickness:3}).setOrigin(0.5);
-    const clSub = this.add.text(W/2,140,'8,200 / 12,000 XP to Level 15',{fontSize:'11px',fill:'#8899AA',fontFamily:'Arial'}).setOrigin(0.5);
-    // XP bar
+    const clNum = this.add.text(W/2,105,String(castleLvl),{fontSize:'52px',fill:'#FFFFFF',fontFamily:'Arial Black',fontStyle:'bold',stroke:'#FFD700',strokeThickness:3}).setOrigin(0.5);
+    const clSub = this.add.text(W/2,140,castleXp.toLocaleString()+' / '+xpNeeded.toLocaleString()+' XP to Level '+(castleLvl+1),{fontSize:'11px',fill:'#8899AA',fontFamily:'Arial'}).setOrigin(0.5);
+    // XP progress bar
     const xpBg = this.add.graphics();
-    xpBg.fillStyle(0x1a1a2e); xpBg.fillRoundedRect(28,150,W-56,10,4);
-    xpBg.fillStyle(0xFFD700,0.9); xpBg.fillRoundedRect(28,150,(W-56)*0.68,10,4);
-    xpBg.fillStyle(0xFFFFFF,0.3); xpBg.fillRoundedRect(28,150,(W-56)*0.28,5,3);
-    panel.add([clBg,clTitle,clNum,clSub,xpBg]);
+    xpBg.fillStyle(0x1a1a2e); xpBg.fillRoundedRect(28,150,W-56,14,5);
+    xpBg.fillStyle(0xFFD700,0.9); xpBg.fillRoundedRect(28,150,(W-56)*xpPct,14,5);
+    if (xpPct > 0.04) { xpBg.fillStyle(0xFFFFFF,0.25); xpBg.fillRoundedRect(28,150,(W-56)*xpPct*0.45,7,4); }
+    const xpPctLabel = this.add.text(W-32,156,Math.round(xpPct*100)+'%',{fontSize:'9px',fill:'#FFD700',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(1,0.5);
+    panel.add([clBg,clTitle,clNum,clSub,xpBg,xpPctLabel]);
 
     // Battle stats grid
     const stats = [
@@ -613,25 +619,23 @@ export class MainMenuScene extends Phaser.Scene {
   // ── SETTINGS PANEL ────────────────────────────────────────────────────────
   _buildSettingsPanel() {
     const { W } = this;
-    const panel = this._makePanel(380);
+    const panel = this._makePanel(480);
     this._panels.settings = panel;
 
     const title = this.add.text(W/2,32,'⚙️  SETTINGS',{fontSize:'18px',fill:'#AABBCC',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5);
     panel.add(title);
 
-    const opts = [
-      { label:'Music', state:true },
-      { label:'Sound FX', state:true },
-      { label:'Notifications', state:false },
-      { label:'Show FPS', state:false },
+    // ── Toggles (Music, Sound FX) — wired to audioSystem ─────────────────
+    const toggles = [
+      { label:'Music',    state:audioSystem.musicEnabled, on:(v)=>audioSystem.setMusicEnabled(v) },
+      { label:'Sound FX', state:audioSystem.sfxEnabled,   on:(v)=>audioSystem.setSfxEnabled(v) },
     ];
-    opts.forEach((opt,i) => {
+    toggles.forEach((opt,i) => {
       const y = 64 + i*62;
       const bg = this.add.graphics();
       bg.fillStyle(0x0a1e14,0.8); bg.fillRoundedRect(12,y,W-24,50,8);
       bg.lineStyle(1,0x2a4a3a,0.4); bg.strokeRoundedRect(12,y,W-24,50,8);
       const lbl = this.add.text(28,y+25,opt.label,{fontSize:'14px',fill:'#AABBCC',fontFamily:'Arial'}).setOrigin(0,0.5);
-      // Toggle
       const tog = this.add.graphics();
       const drawTog = (on) => {
         tog.clear();
@@ -640,14 +644,63 @@ export class MainMenuScene extends Phaser.Scene {
       };
       drawTog(opt.state);
       const zone = this.add.zone(W-46,y+25,52,22).setInteractive({useHandCursor:true});
-      zone.on('pointerdown',()=>{ opt.state=!opt.state; drawTog(opt.state); });
+      zone.on('pointerdown',()=>{
+        opt.state = !opt.state;
+        drawTog(opt.state);
+        opt.on(opt.state);
+        // If re-enabling music, restart the current track
+        if (opt.label==='Music' && opt.state) audioSystem.playTrack('battle_hymn');
+      });
       panel.add([bg,lbl,tog,zone]);
     });
 
-    // Sign out button
+    // ── Music track selector ──────────────────────────────────────────────
+    const trackY = 196;
+    const trackBg = this.add.graphics();
+    trackBg.fillStyle(0x0a1e14,0.8); trackBg.fillRoundedRect(12,trackY,W-24,170,8);
+    trackBg.lineStyle(1,0x2a4a3a,0.4); trackBg.strokeRoundedRect(12,trackY,W-24,170,8);
+    const trackTitle = this.add.text(W/2,trackY+14,'🎵  MUSIC TRACK',{fontSize:'11px',fill:'#667788',fontFamily:'Arial',letterSpacing:2}).setOrigin(0.5);
+    panel.add([trackBg,trackTitle]);
+
+    const tracks = [
+      { key:'battle_hymn',  label:'Battle Hymn',  sub:'Peaceful · D Major · 76 BPM',  color:0x2244aa },
+      { key:'ember_rush',   label:'Ember Rush',   sub:'Energetic · A Minor · 138 BPM', color:0xaa4400 },
+      { key:'frost_crown',  label:'Frost Crown',  sub:'Atmospheric · D Minor · 124 BPM',color:0x2266aa },
+    ];
+    let activeTrack = audioSystem.currentTrackName || 'battle_hymn';
+    const trackDots = [];
+
+    tracks.forEach((tr, i) => {
+      const ty = trackY + 34 + i * 42;
+      const rowBg = this.add.graphics();
+      const dot = this.add.graphics();
+      const drawRow = (active) => {
+        rowBg.clear(); dot.clear();
+        rowBg.fillStyle(active?tr.color:0x0a1014, active?0.35:0.5);
+        rowBg.fillRoundedRect(20,ty,W-40,34,6);
+        if (active) { rowBg.lineStyle(1.5,tr.color,0.8); rowBg.strokeRoundedRect(20,ty,W-40,34,6); }
+        dot.fillStyle(active?0x44FF88:0x334455); dot.fillCircle(36,ty+17,7);
+        if (active) { dot.fillStyle(0xFFFFFF); dot.fillCircle(36,ty+17,3.5); }
+      };
+      drawRow(activeTrack === tr.key);
+      trackDots.push({ key:tr.key, draw:drawRow });
+
+      const nameTxt = this.add.text(52,ty+8,tr.label,{fontSize:'13px',fill:'#FFFFFF',fontFamily:'Arial',fontStyle:'bold'});
+      const subTxt  = this.add.text(52,ty+24,tr.sub,{fontSize:'9px',fill:'#778899',fontFamily:'Arial'});
+
+      const zone = this.add.zone(W/2,ty+17,W-40,34).setInteractive({useHandCursor:true});
+      zone.on('pointerdown',()=>{
+        activeTrack = tr.key;
+        trackDots.forEach(d => d.draw(d.key === activeTrack));
+        audioSystem.playTrack(tr.key);
+      });
+      panel.add([rowBg,dot,nameTxt,subTxt,zone]);
+    });
+
+    // ── Sign out ──────────────────────────────────────────────────────────
     const soBg = this.add.graphics();
-    soBg.fillStyle(0x660000); soBg.fillRoundedRect(W/2-70,312,140,38,8);
-    const soBtn = this.add.text(W/2,331,'SIGN OUT',{fontSize:'14px',fill:'#FFFFFF',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5).setInteractive({useHandCursor:true});
+    soBg.fillStyle(0x660000); soBg.fillRoundedRect(W/2-70,408,140,38,8);
+    const soBtn = this.add.text(W/2,427,'SIGN OUT',{fontSize:'14px',fill:'#FFFFFF',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5).setInteractive({useHandCursor:true});
     soBtn.on('pointerdown',()=>{ localStorage.clear(); this.scene.start('Auth'); });
     panel.add([title,soBg,soBtn]);
   }
