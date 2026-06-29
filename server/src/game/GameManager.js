@@ -34,13 +34,27 @@ class GameManager {
     }
   }
 
-  // Instantly create a game against a CPU bot
+  // Instantly create a 1v1 game against a CPU bot
   createBotGame(socket, data) {
     const { userId, username, deck } = data;
     const botUserId = `cpu_${uuidv4().slice(0, 8)}`;
     const humanPlayer = { socket, userId, username, deck };
-    const botPlayer   = { socket: null, userId: botUserId, username: 'CPU Bot', deck: [] };
-    this._createRoom([humanPlayer, botPlayer], '1v1', botUserId);
+    const botPlayer   = { socket: null, userId: botUserId, username: '🤖 CPU', deck: [] };
+    this._createRoom([humanPlayer, botPlayer], '1v1', [botUserId]);
+  }
+
+  // 2v2 bot: you + bot ally vs 2 bot enemies
+  createBot2v2Game(socket, data) {
+    const { userId, username, deck } = data;
+    const allyId   = `cpu_${uuidv4().slice(0, 8)}`;
+    const enemy1Id = `cpu_${uuidv4().slice(0, 8)}`;
+    const enemy2Id = `cpu_${uuidv4().slice(0, 8)}`;
+    const human  = { socket, userId, username, deck };
+    const ally   = { socket: null, userId: allyId,   username: '🤖 Ally',    deck: [] };
+    const enemy1 = { socket: null, userId: enemy1Id, username: '🤖 Enemy 1', deck: [] };
+    const enemy2 = { socket: null, userId: enemy2Id, username: '🤖 Enemy 2', deck: [] };
+    // 2v2 room: first 2 = p1 team, last 2 = p2 team
+    this._createRoom([human, ally, enemy1, enemy2], '2v2', [allyId, enemy1Id, enemy2Id]);
   }
 
   inviteFriend(socket, data) {
@@ -69,7 +83,7 @@ class GameManager {
     this.queue2v2 = this.queue2v2.filter(e => e.userId !== userId);
   }
 
-  _createRoom(players, mode, botUserId = null) {
+  _createRoom(players, mode, botUserIds = null) {
     const roomId = uuidv4();
     const maps = ['ember_crossing', 'frostpeak_arena'];
     const map = maps[Math.floor(Math.random() * maps.length)];
@@ -87,16 +101,21 @@ class GameManager {
 
     room.start();
 
-    // Wire up bot controller if CPU game
-    let bot = null;
-    if (botUserId) {
-      const botKey = room.playerKey[botUserId];
-      bot = new BotController(room, botUserId, botKey);
-      bot.start();
+    // Start a BotController for each bot userId
+    const bots = [];
+    if (botUserIds && botUserIds.length) {
+      for (const bId of botUserIds) {
+        const bKey = room.playerKey[bId];
+        if (bKey) {
+          const b = new BotController(room, bId, bKey);
+          b.start();
+          bots.push(b);
+        }
+      }
     }
 
     room.onEnd = () => {
-      if (bot) bot.stop();
+      bots.forEach(b => b.stop());
       for (const p of players) this.userToRoom.delete(p.userId);
       this.rooms.delete(roomId);
     };

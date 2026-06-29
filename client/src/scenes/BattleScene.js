@@ -239,7 +239,7 @@ export class BattleScene extends Phaser.Scene {
     // Opponent
     const opKey = this.myKey === 'p1' ? 'p2' : 'p1';
     const opInfo = this.matchInfo?.players?.find(p =>
-      this.matchInfo.teams[opKey]?.includes(p.userId)
+      this.matchInfo?.teams?.[opKey]?.includes(p.userId)
     );
     const opName = opInfo?.username || 'Opponent';
     this.add.text(W - 10, 50, opName, {

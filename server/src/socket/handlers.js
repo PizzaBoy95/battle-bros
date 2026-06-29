@@ -64,6 +64,16 @@ function registerHandlers(io, gameManager) {
       });
     });
 
+    socket.on('play_vs_cpu_2v2', (data) => {
+      const { deck } = data || {};
+      socket.data.deck = deck;
+      gameManager.createBot2v2Game(socket, {
+        userId: socket.data.userId,
+        username: socket.data.username,
+        deck
+      });
+    });
+
     // ── Battle ─────────────────────────────────────────────────────────────────
     socket.on('deploy_unit', (data) => {
       gameManager.deployUnit(socket, data);
