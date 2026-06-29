@@ -96,7 +96,13 @@ export class BattleScene extends Phaser.Scene {
     // Deck hand at bottom
     this._buildHandCards();
 
-    // Touch/click to deploy
+    // Drag-to-deploy global listeners
+    this._dragging = false;
+    this._dragCardIdx = -1;
+    this._ghostG = null;
+    this.input.on('pointermove', (ptr) => this._onPointerMove(ptr));
+    this.input.on('pointerup',   (ptr) => this._onPointerUp(ptr));
+    // Tap-on-map fallback (fires only when NOT on a card)
     this.input.on('pointerdown', (ptr) => this._onTap(ptr));
 
     // Socket events
@@ -124,7 +130,6 @@ export class BattleScene extends Phaser.Scene {
   }
 
   _buildTowers() {
-    const { width: W, height: H } = this.scale;
     this.towerObjects = {};
 
     for (const playerKey of ['p1', 'p2']) {
@@ -135,37 +140,79 @@ export class BattleScene extends Phaser.Scene {
         const isEnemy = playerKey !== this.myKey;
 
         const g = this.add.graphics().setDepth(2);
-        const tw = isKing ? 54 : 40, th = isKing ? 70 : 54;
+        const tw = isKing ? 58 : 44, th = isKing ? 80 : 60;
+        const SIDE = 9; // depth illusion thickness
 
-        // Tower body
-        g.fillStyle(isEnemy ? 0xC0392B : 0x2980B9);
+        // Ground shadow ellipse
+        g.fillStyle(0x000000, 0.30);
+        g.fillEllipse(pos.x + SIDE / 2, pos.y + 16, tw + 28, 14);
+
+        // Right-side depth face (darker)
+        const sideCol = isEnemy ? 0x641A11 : 0x10304A;
+        g.fillStyle(sideCol);
+        g.fillRect(pos.x + tw / 2, pos.y - th + 10, SIDE, th + 6);
+
+        // Main tower body
+        const bodyCol = isEnemy ? 0xA93226 : 0x2471A3;
+        g.fillStyle(bodyCol);
         g.fillRect(pos.x - tw / 2, pos.y - th + 10, tw, th);
 
-        // Tower top battlements
-        const btColor = isEnemy ? 0x922B21 : 0x1A5276;
-        g.fillStyle(btColor);
+        // Stone brick texture
+        g.fillStyle(0x000000, 0.10);
+        for (let row = 0; row < Math.floor(th / 10); row++) {
+          const ry = pos.y - th + 10 + row * 10;
+          g.fillRect(pos.x - tw / 2, ry, tw, 1);
+          const offset = (row % 2) * 10;
+          for (let col = 0; col < 5; col++) {
+            g.fillRect(pos.x - tw / 2 + offset + col * 20, ry, 1, 10);
+          }
+        }
+
+        // Highlight strip (left edge — light source from left)
+        g.fillStyle(0xFFFFFF, 0.14);
+        g.fillRect(pos.x - tw / 2, pos.y - th + 10, 3, th);
+
+        // Battlements
+        const merCol  = isEnemy ? 0x871E18 : 0x1A4A72;
+        const merSide = isEnemy ? 0x621610 : 0x123654;
+        const slotW = Math.floor(tw / 4);
         for (let i = 0; i < 4; i++) {
-          g.fillRect(pos.x - tw / 2 + i * (tw / 4), pos.y - th, tw / 5, 14);
+          const bx = pos.x - tw / 2 + i * slotW;
+          g.fillStyle(merCol);
+          g.fillRect(bx, pos.y - th, slotW - 4, 15);
+          g.fillStyle(merSide);
+          g.fillRect(bx + slotW - 4, pos.y - th, SIDE / 2 + 1, 15);
+          g.fillStyle(0xFFFFFF, 0.12);
+          g.fillRect(bx, pos.y - th, 2, 15);
         }
 
-        // Tower base
-        g.fillStyle(isEnemy ? 0x7B241C : 0x154360);
-        g.fillRect(pos.x - tw / 2 - 4, pos.y + 8, tw + 8, 12);
+        // Base platform
+        const baseCol = isEnemy ? 0x5A1911 : 0x0E2A3D;
+        g.fillStyle(baseCol);
+        g.fillRect(pos.x - tw / 2 - 5, pos.y + 8, tw + 10 + SIDE, 12);
 
-        // Crown on king tower
+        // King tower crown
         if (isKing) {
+          g.fillStyle(0xD4AC0D);
+          g.fillTriangle(pos.x - 13, pos.y - th - 2, pos.x, pos.y - th - 18, pos.x + 13, pos.y - th - 2);
           g.fillStyle(0xFFD700);
-          g.fillTriangle(pos.x - 10, pos.y - th - 2, pos.x, pos.y - th - 14, pos.x + 10, pos.y - th - 2);
+          g.fillTriangle(pos.x - 11, pos.y - th - 3, pos.x, pos.y - th - 15, pos.x + 11, pos.y - th - 3);
+          g.fillStyle(0xFFEE88, 0.5);
+          g.fillTriangle(pos.x - 7, pos.y - th - 3, pos.x - 1, pos.y - th - 13, pos.x + 3, pos.y - th - 3);
         }
 
-        // HP bar background
-        const hpBg = this.add.rectangle(pos.x, pos.y + 20, tw + 4, 8, 0x1a1a1a).setDepth(3);
-        const hpBar = this.add.rectangle(pos.x, pos.y + 20, tw, 6, isEnemy ? 0xE74C3C : 0x27AE60)
-          .setDepth(4).setOrigin(0.5);
+        // Archer silhouette on top
+        const archerCol = isEnemy ? 0xFF7777 : 0x77CCFF;
+        g.fillStyle(archerCol, 0.85);
+        g.fillCircle(pos.x, pos.y - th - 5, 5);
+        g.fillRect(pos.x - 3, pos.y - th + 1, 6, 9);
 
-        // HP text
+        // HP bar
         const maxHp = isKing ? TOWER_MAX.king : TOWER_MAX.guard;
-        const hpText = this.add.text(pos.x, pos.y + 32, String(maxHp), {
+        const hpBg  = this.add.rectangle(pos.x + SIDE / 2, pos.y + 22, tw + 8, 8, 0x0a0a0a).setDepth(3);
+        const hpBar = this.add.rectangle(pos.x + SIDE / 2, pos.y + 22, tw + 4, 6, isEnemy ? 0xE74C3C : 0x27AE60)
+          .setDepth(4).setOrigin(0.5);
+        const hpText = this.add.text(pos.x + SIDE / 2, pos.y + 34, String(maxHp), {
           fontSize: '10px', fill: '#FFFFFF', fontFamily: 'Arial'
         }).setOrigin(0.5).setDepth(4);
 
@@ -213,24 +260,38 @@ export class BattleScene extends Phaser.Scene {
 
   _buildDeployZone() {
     const { width: W, height: H } = this.scale;
-    const zoneG = this.add.graphics().setDepth(1).setAlpha(0.08);
-    zoneG.fillStyle(0xFFFFFF);
+    this._deployZoneG = this.add.graphics().setDepth(1).setAlpha(0.10);
+    this._deployZoneG.fillStyle(0x00FF88);
     if (this.myKey === 'p1') {
-      zoneG.fillRect(62, 596, W - 124, 220);
+      this._deployZoneG.fillRect(62, 596, W - 124, 220);
     } else {
-      zoneG.fillRect(62, 38, W - 124, 220);
+      this._deployZoneG.fillRect(62, 38, W - 124, 220);
     }
+    // Zone label
+    const zy = this.myKey === 'p1' ? 620 : 58;
+    this.add.text(W / 2, zy, 'YOUR TERRITORY', {
+      fontSize: '9px', fill: '#00FF88', fontFamily: 'Arial', alpha: 0.4, letterSpacing: 3
+    }).setOrigin(0.5).setDepth(2).setAlpha(0.35);
   }
 
   _buildHandCards() {
     const { width: W, height: H } = this.scale;
-    const CARD_W = 56, CARD_H = 70;
+    // Bigger cards for easy mobile tapping
+    const CARD_W = 64, CARD_H = 86;
+    const GAP = 7;
     const totalCards = Math.min(this.deck.length, DECK_SIZE);
-    const startX = W / 2 - ((totalCards - 1) * (CARD_W + 6)) / 2;
-    const cardY = H - 80;
+    const totalW = totalCards * (CARD_W + GAP) - GAP;
+    const startX = W / 2 - totalW / 2 + CARD_W / 2;
+    // Card bar background
+    const barG = this.add.graphics().setDepth(7);
+    barG.fillStyle(0x05050F, 0.92);
+    barG.fillRect(0, H - CARD_H - 28, W, CARD_H + 28);
+    barG.lineStyle(1, 0x334466, 0.6);
+    barG.strokeRect(0, H - CARD_H - 28, W, 1);
+
+    const cardY = H - CARD_H / 2 - 12;
 
     this.handCards = [];
-    this.handCardGraphics = [];
 
     for (let i = 0; i < totalCards; i++) {
       const charId = this.deck[i];
@@ -238,41 +299,68 @@ export class BattleScene extends Phaser.Scene {
       const char = CHARACTERS[charId];
       if (!char) continue;
 
-      const cx = startX + i * (CARD_W + 6);
+      const cx = startX + i * (CARD_W + GAP);
       const isSelected = i === this.selectedCardIdx;
+      const rarityColor = RARITY_COLORS[char.rarity] || 0x888888;
 
       const cardG = this.add.graphics().setDepth(8);
-      const rarityColor = RARITY_COLORS[char.rarity];
 
-      cardG.fillStyle(isSelected ? 0x2a2a4a : 0x12122a);
-      cardG.fillRoundedRect(cx - CARD_W / 2, cardY - CARD_H / 2, CARD_W, CARD_H, 5);
-      cardG.lineStyle(2, isSelected ? 0xFFD700 : rarityColor, isSelected ? 1 : 0.5);
-      cardG.strokeRoundedRect(cx - CARD_W / 2, cardY - CARD_H / 2, CARD_W, CARD_H, 5);
+      // Card shadow
+      cardG.fillStyle(0x000000, 0.5);
+      cardG.fillRoundedRect(cx - CARD_W / 2 + 3, cardY - CARD_H / 2 + 3, CARD_W, CARD_H, 7);
 
-      // Character mini-drawing
+      // Card body
+      cardG.fillStyle(isSelected ? 0x1E1E3C : 0x0E0E20);
+      cardG.fillRoundedRect(cx - CARD_W / 2, cardY - CARD_H / 2, CARD_W, CARD_H, 7);
+
+      // Rarity stripe at bottom of card
+      cardG.fillStyle(rarityColor, 0.7);
+      cardG.fillRoundedRect(cx - CARD_W / 2, cardY + CARD_H / 2 - 10, CARD_W, 10, { bl: 7, br: 7, tl: 0, tr: 0 });
+
+      // Border
+      cardG.lineStyle(isSelected ? 2.5 : 1.5, isSelected ? 0xFFD700 : rarityColor, isSelected ? 1 : 0.45);
+      cardG.strokeRoundedRect(cx - CARD_W / 2, cardY - CARD_H / 2, CARD_W, CARD_H, 7);
+
+      // If selected: gold glow outline
+      if (isSelected) {
+        cardG.lineStyle(5, 0xFFD700, 0.18);
+        cardG.strokeRoundedRect(cx - CARD_W / 2 - 2, cardY - CARD_H / 2 - 2, CARD_W + 4, CARD_H + 4, 9);
+      }
+
+      // Character drawing (centered in upper 3/4 of card)
       const charG = this.add.graphics().setDepth(9);
-      charG.x = cx; charG.y = cardY - 10;
+      charG.x = cx; charG.y = cardY - 8;
       const fn = DRAW_FUNCS[charId];
       if (fn) fn(charG);
-      charG.setScale(0.38);
+      charG.setScale(0.42);
 
-      // Elixir cost
+      // Elixir cost badge (top-left)
       const elixirG = this.add.graphics().setDepth(9);
-      elixirG.fillStyle(0x8E44AD);
-      elixirG.fillCircle(cx + CARD_W / 2 - 10, cardY - CARD_H / 2 + 10, 10);
-      const costText = this.add.text(cx + CARD_W / 2 - 10, cardY - CARD_H / 2 + 10, String(char.elixirCost), {
-        fontSize: '10px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold'
-      }).setOrigin(0.5).setDepth(10);
+      elixirG.fillStyle(0x6C1D9E);
+      elixirG.fillCircle(cx - CARD_W / 2 + 13, cardY - CARD_H / 2 + 13, 12);
+      elixirG.lineStyle(1.5, 0xDD88FF, 0.7);
+      elixirG.strokeCircle(cx - CARD_W / 2 + 13, cardY - CARD_H / 2 + 13, 12);
+      const costText = this.add.text(cx - CARD_W / 2 + 13, cardY - CARD_H / 2 + 13,
+        String(char.elixirCost), {
+          fontSize: '12px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold'
+        }).setOrigin(0.5).setDepth(10);
 
-      // Name
-      const nameText = this.add.text(cx, cardY + CARD_H / 2 - 12, char.name.split(' ')[0], {
-        fontSize: '8px', fill: '#AAAACC', fontFamily: 'Arial'
-      }).setOrigin(0.5).setDepth(9);
+      // Character name at bottom
+      const nameText = this.add.text(cx, cardY + CARD_H / 2 - 5,
+        char.name.split(' ')[0].slice(0, 8), {
+          fontSize: '9px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold'
+        }).setOrigin(0.5).setDepth(10);
 
-      // Hit zone
-      const zone = this.add.zone(cx, cardY, CARD_W, CARD_H)
+      // Large interactive hit zone — full card area + extra padding for fat fingers
+      const zone = this.add.zone(cx, cardY, CARD_W + 14, CARD_H + 14)
         .setInteractive({ useHandCursor: true }).setDepth(11);
-      zone.on('pointerdown', () => { this.selectedCardIdx = i; this._refreshHandCards(); audioSystem.playClick(); });
+
+      zone.on('pointerdown', (ptr) => {
+        this.selectedCardIdx = i;
+        this._refreshHandCards();
+        audioSystem.playClick();
+        this._startDrag(i, ptr);
+      });
 
       this.handCards.push({ charId, cx, cardY, cardG, charG, elixirG, costText, nameText, zone, idx: i });
     }
@@ -280,18 +368,34 @@ export class BattleScene extends Phaser.Scene {
   }
 
   _refreshHandCards() {
+    const CW = 64, CH = 86;
     for (const card of this.handCards) {
       const char = CHARACTERS[card.charId];
       const isSelected = card.idx === this.selectedCardIdx;
       const canAfford = char && this.myElixir >= char.elixirCost;
-      const rarityColor = RARITY_COLORS[char?.rarity];
+      const rarityColor = RARITY_COLORS[char?.rarity] || 0x888888;
 
       card.cardG.clear();
-      card.cardG.fillStyle(isSelected ? 0x2a2a4a : 0x12122a, canAfford ? 1 : 0.5);
-      card.cardG.fillRoundedRect(card.cx - 28, card.cardY - 35, 56, 70, 5);
-      card.cardG.lineStyle(2, isSelected ? 0xFFD700 : (rarityColor || 0x888888), isSelected ? 1 : 0.4);
-      card.cardG.strokeRoundedRect(card.cx - 28, card.cardY - 35, 56, 70, 5);
-      card.charG.setAlpha(canAfford ? 1 : 0.4);
+      const alpha = canAfford ? 1 : 0.45;
+
+      card.cardG.fillStyle(0x000000, 0.5 * alpha);
+      card.cardG.fillRoundedRect(card.cx - CW / 2 + 3, card.cardY - CH / 2 + 3, CW, CH, 7);
+
+      card.cardG.fillStyle(isSelected ? 0x1E1E3C : 0x0E0E20, alpha);
+      card.cardG.fillRoundedRect(card.cx - CW / 2, card.cardY - CH / 2, CW, CH, 7);
+
+      card.cardG.fillStyle(rarityColor, 0.7 * alpha);
+      card.cardG.fillRoundedRect(card.cx - CW / 2, card.cardY + CH / 2 - 10, CW, 10, { bl: 7, br: 7, tl: 0, tr: 0 });
+
+      card.cardG.lineStyle(isSelected ? 2.5 : 1.5, isSelected ? 0xFFD700 : rarityColor, isSelected ? alpha : 0.4 * alpha);
+      card.cardG.strokeRoundedRect(card.cx - CW / 2, card.cardY - CH / 2, CW, CH, 7);
+
+      if (isSelected) {
+        card.cardG.lineStyle(5, 0xFFD700, 0.18);
+        card.cardG.strokeRoundedRect(card.cx - CW / 2 - 2, card.cardY - CH / 2 - 2, CW + 4, CH + 4, 9);
+      }
+
+      card.charG.setAlpha(canAfford ? 1 : 0.3);
     }
   }
 
@@ -306,34 +410,80 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
-  _onTap(ptr) {
+  // ── Drag-to-deploy ─────────────────────────────────────────────────────────
+  _startDrag(idx, ptr) {
     if (this.gameOver) return;
+    this._dragging = true;
+    this._dragCardIdx = idx;
+    const card = this.handCards[idx];
+    if (!card) return;
 
-    const { width: W, height: H } = this.scale;
+    // Ghost unit follows pointer
+    this._ghostG = this.add.graphics().setDepth(22).setAlpha(0.75);
+    const fn = DRAW_FUNCS[card.charId];
+    if (fn) fn(this._ghostG);
+    this._ghostG.setScale(0.68);
+    this._ghostG.setPosition(ptr.x, ptr.y);
 
-    // Check if tapping on a hand card (y > H - 120)
-    if (ptr.y > H - 120) return;
+    // Brighten deploy zone
+    this._deployZoneG?.setAlpha(0.22);
+  }
 
-    // Deploy zone check
-    const inMyZone = this.myKey === 'p1'
-      ? (ptr.y >= 596 && ptr.y <= 820)
-      : (ptr.y >= 38 && ptr.y <= 258);
+  _onPointerMove(ptr) {
+    if (!this._dragging || !this._ghostG) return;
+    this._ghostG.setPosition(ptr.x, ptr.y);
+    const inZone = this._inMyDeployZone(ptr.x, ptr.y);
+    this._ghostG.setAlpha(inZone ? 0.88 : 0.32);
+    this._deployZoneG?.setAlpha(inZone ? 0.32 : 0.22);
+  }
 
-    if (!inMyZone) return;
+  _onPointerUp(ptr) {
+    if (!this._dragging) return;
+    const card = this.handCards[this._dragCardIdx];
+    if (card && this._inMyDeployZone(ptr.x, ptr.y)) {
+      const char = CHARACTERS[card.charId];
+      if (char && this.myElixir >= char.elixirCost) {
+        socketManager.deployUnit(card.charId, Math.round(ptr.x), Math.round(ptr.y), 1);
+        audioSystem.playDeploy();
+        this._buildDeployIndicator(ptr.x, ptr.y);
+        this.myElixir = Math.max(0, this.myElixir - char.elixirCost);
+        this.elixirSystem.update(this.myElixir, this.overtime);
+      } else if (char) {
+        this._showNotEnoughElixir();
+      }
+    }
+    this._endDrag();
+  }
+
+  _endDrag() {
+    this._dragging = false;
+    this._dragCardIdx = -1;
+    this._ghostG?.destroy();
+    this._ghostG = null;
+    this._deployZoneG?.setAlpha(0.10);
+  }
+
+  _inMyDeployZone(x, y) {
+    return this.myKey === 'p1'
+      ? (y >= 596 && y <= 820)
+      : (y >= 38  && y <= 258);
+  }
+
+  // Fallback: tap on map directly while card selected (no drag)
+  _onTap(ptr) {
+    if (this.gameOver || this._dragging) return;
+    const { height: H } = this.scale;
+    if (ptr.y > H - 115) return; // in card bar → handled by card zone
+
+    if (!this._inMyDeployZone(ptr.x, ptr.y)) return;
 
     const selCard = this.handCards[this.selectedCardIdx];
     if (!selCard) return;
-
     const char = CHARACTERS[selCard.charId];
     if (!char) return;
-    if (this.myElixir < char.elixirCost) {
-      this._showNotEnoughElixir();
-      return;
-    }
+    if (this.myElixir < char.elixirCost) { this._showNotEnoughElixir(); return; }
 
-    // Deploy
-    const charLevel = 1; // TODO: use actual level from charData
-    socketManager.deployUnit(selCard.charId, Math.round(ptr.x), Math.round(ptr.y), charLevel);
+    socketManager.deployUnit(selCard.charId, Math.round(ptr.x), Math.round(ptr.y), 1);
     audioSystem.playDeploy();
     this._buildDeployIndicator(ptr.x, ptr.y);
     this.myElixir = Math.max(0, this.myElixir - char.elixirCost);

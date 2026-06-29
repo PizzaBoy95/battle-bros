@@ -6,14 +6,33 @@ import { CHARACTERS, RARITY_COLORS } from './CharacterRegistry.js';
 
 const DRAW_FUNCS = {
   titan_grunt(g) {
-    // Massive armored warrior
-    g.fillStyle(0x5C3317); g.fillRect(-20, -28, 40, 50); // body
-    g.fillStyle(0xC0C0C0); g.fillRect(-22, -30, 44, 14); // shoulder armor
-    g.fillStyle(0x8B4513); g.fillCircle(0, -38, 14);     // head
-    g.fillStyle(0x888888); g.fillRect(-4, -44, 8, 4);    // helmet top
-    g.fillStyle(0xFFD700); g.fillRect(-18, -8, 8, 20);   // left weapon
-    g.fillStyle(0xC0C0C0); g.fillRect(10, -26, 16, 32);  // shield
-    g.fillStyle(0xFFD700); g.fillCircle(18, -10, 5);     // shield emblem
+    // Massive legendary armored warrior — multi-layer shading for 3D feel
+    // Body (dark base + highlight)
+    g.fillStyle(0x3E2208); g.fillRect(-21, -27, 42, 51);  // shadow side
+    g.fillStyle(0x6B3A12); g.fillRect(-20, -28, 40, 50);  // body
+    g.fillStyle(0x8A5020, 0.5); g.fillRect(-20, -28, 10, 50); // highlight strip
+    // Shoulder pauldrons
+    g.fillStyle(0x808080); g.fillRect(-26, -30, 48, 14);
+    g.fillStyle(0xC8C8C8); g.fillRect(-24, -32, 44, 10);
+    g.fillStyle(0xE8E8E8, 0.4); g.fillRect(-22, -32, 8, 6); // light sheen
+    // Helm
+    g.fillStyle(0x555555); g.fillCircle(0, -38, 15);
+    g.fillStyle(0x909090); g.fillCircle(0, -38, 13);
+    g.fillStyle(0xCCCCCC, 0.3); g.fillCircle(-4, -42, 6);   // helm glint
+    g.fillStyle(0x555555); g.fillRect(-4, -44, 8, 5);       // crest
+    // Visor slit
+    g.fillStyle(0xFF4400, 0.8); g.fillRect(-8, -38, 16, 4);
+    // War axe (left hand)
+    g.fillStyle(0x8B7355); g.fillRect(-24, -12, 6, 28);
+    g.fillStyle(0xC8C8C8); g.fillTriangle(-28, -14, -16, -14, -22, -28);
+    g.fillStyle(0xE8E8E8, 0.4); g.fillTriangle(-27, -15, -23, -15, -25, -25); // blade sheen
+    // Tower shield (right)
+    g.fillStyle(0x444444); g.fillRect(11, -28, 18, 36);
+    g.fillStyle(0x666666); g.fillRect(12, -27, 16, 34);
+    g.fillStyle(0xFFD700); g.fillCircle(20, -10, 5);
+    g.fillStyle(0xFFEE88, 0.5); g.fillCircle(18, -12, 2.5);
+    // Belt details
+    g.fillStyle(0xFFD700, 0.7); g.fillRect(-20, 12, 40, 4);
   },
 
   pyro_drake(g) {
@@ -70,20 +89,38 @@ const DRAW_FUNCS = {
   },
 
   stone_golem(g) {
-    // Giant rocky monster
-    g.fillStyle(0x616A6B); g.fillRect(-24, -28, 48, 56); // huge body
-    g.fillStyle(0x717D7E); g.fillCircle(0, -38, 18);     // round head
-    g.fillStyle(0x4D5656); g.fillRect(-8, -40, 6, 8);    // eye socket
-    g.fillRect(2, -40, 6, 8);
-    g.fillStyle(0xFF6600); g.fillCircle(-5, -37, 3);     // glowing eyes
-    g.fillCircle(5, -37, 3);
-    g.fillStyle(0x5D6D7E);
-    // Rocky texture lines
-    g.fillRect(-22, -18, 44, 3);
-    g.fillRect(-22, -4, 44, 3);
-    g.fillRect(-22, 10, 44, 3);
-    g.fillStyle(0x616A6B); g.fillRect(-32, -20, 10, 30); // left arm
-    g.fillRect(22, -20, 10, 30);                          // right arm
+    // Massive rock monster — layered shading for stone 3D effect
+    // Arm shadows
+    g.fillStyle(0x3A4040); g.fillRect(-35, -22, 12, 34); // left arm shadow
+    g.fillRect(23, -22, 12, 34);                          // right arm shadow
+    // Arms
+    g.fillStyle(0x5A6465); g.fillRect(-34, -22, 12, 34);
+    g.fillRect(22, -22, 12, 34);
+    // Arm highlights
+    g.fillStyle(0x7A8888, 0.5); g.fillRect(-34, -22, 4, 34);
+    // Body shadow
+    g.fillStyle(0x3A4040); g.fillRect(-22, -26, 46, 58);
+    // Body
+    g.fillStyle(0x5A6465); g.fillRect(-22, -28, 44, 56);
+    // Stone crack textures
+    g.fillStyle(0x404848, 0.9);
+    g.fillRect(-18, -16, 36, 2); g.fillRect(-18, -4, 36, 2); g.fillRect(-18, 8, 36, 2);
+    g.fillRect(-10, -22, 2, 12); g.fillRect(8, -8, 2, 16);  // vertical cracks
+    // Body highlight (top-left light)
+    g.fillStyle(0x7A8888, 0.4); g.fillRect(-22, -28, 8, 56);
+    // Head shadow
+    g.fillStyle(0x3A4040); g.fillCircle(2, -37, 18);
+    // Head
+    g.fillStyle(0x5A6465); g.fillCircle(0, -38, 18);
+    // Eye sockets
+    g.fillStyle(0x252E2E); g.fillRect(-9, -41, 7, 8); g.fillRect(2, -41, 7, 8);
+    // Glowing eyes
+    g.fillStyle(0xFF8800); g.fillCircle(-5.5, -37, 3.5); g.fillCircle(5.5, -37, 3.5);
+    g.fillStyle(0xFFCC00, 0.6); g.fillCircle(-5.5, -37, 1.5); g.fillCircle(5.5, -37, 1.5);
+    // Head highlight
+    g.fillStyle(0x7A8888, 0.35); g.fillCircle(-6, -42, 8);
+    // Mossy patches
+    g.fillStyle(0x2D6A4F, 0.5); g.fillCircle(10, -20, 6); g.fillCircle(-14, -2, 5);
   },
 
   thunder_chief(g) {
@@ -310,6 +347,23 @@ const DRAW_FUNCS = {
     g.fillRect(1, -28, 2, 3);
   }
 };
+
+// Wrap every public draw function to add a ground shadow and top-light sheen.
+// This gives all units a grounded, slightly 3D appearance with minimal extra code.
+for (const key of Object.keys(DRAW_FUNCS)) {
+  if (key.startsWith('_')) continue; // skip private helpers
+  const original = DRAW_FUNCS[key];
+  DRAW_FUNCS[key] = (g) => {
+    // Ground shadow (oval beneath the unit)
+    g.fillStyle(0x000000, 0.30);
+    g.fillEllipse(5, 26, 46, 10);
+    // Draw the character
+    original(g);
+    // Top-left ambient light hint (very subtle)
+    g.fillStyle(0xFFFFFF, 0.04);
+    g.fillCircle(-12, -44, 18);
+  };
+}
 
 export function generateCharacterTexture(scene, charId, size = 40) {
   const key = `char_${charId}_${size}`;
