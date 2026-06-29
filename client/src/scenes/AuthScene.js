@@ -10,120 +10,149 @@ export class AuthScene extends Phaser.Scene {
     const { width: W, height: H } = this.scale;
     this.mode = 'login';
 
-    // Background
-    this.add.rectangle(0, 0, W, H, 0x050510).setOrigin(0);
+    // ── Phaser background visuals ──────────────────────────────────────────
+    this.add.rectangle(0, 0, W, H, 0x000000).setOrigin(0);
 
-    const stars = this.add.graphics();
+    const bg = this.add.graphics();
+    [
+      [0x0d021e, 0.6, 380],
+      [0x060112, 0.4, 220],
+    ].forEach(([c, a, r]) => { bg.fillStyle(c, a); bg.fillCircle(W / 2, H / 2, r); });
+
+    const sg = this.add.graphics();
     for (let i = 0; i < 60; i++) {
-      stars.fillStyle(0xFFFFFF, 0.2 + Math.random() * 0.5);
-      stars.fillRect(Math.random() * W, Math.random() * H, 1, 1);
+      sg.fillStyle(0xFFFFFF, 0.1 + Math.random() * 0.25);
+      sg.fillRect(Math.random() * W, Math.random() * H, 1, 1);
     }
 
-    // Title
-    this.add.text(W / 2, 60, 'BATTLE BROS', {
-      fontSize: '32px', fill: '#FFD700',
+    this.add.text(W / 2, 52, 'BATTLE BROS', {
+      fontSize: '30px', fill: '#FFE566',
       fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
-      stroke: '#8B4513', strokeThickness: 4
+      stroke: '#3D1C00', strokeThickness: 5
     }).setOrigin(0.5);
 
-    // Panel background
-    const panelY = H / 2 + 20;
-    this.add.rectangle(W / 2, panelY, 340, 440, 0x0d0d22, 0.95)
-      .setOrigin(0.5).setStrokeStyle(2, 0x3a3a6e);
-
-    // Mode tabs
-    this.loginTab = this.add.text(W / 2 - 80, panelY - 200, 'LOGIN', {
-      fontSize: '15px', fill: '#FFD700',
-      fontFamily: 'Arial', fontStyle: 'bold'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-    this.registerTab = this.add.text(W / 2 + 80, panelY - 200, 'SIGN UP', {
-      fontSize: '15px', fill: '#888888',
-      fontFamily: 'Arial', fontStyle: 'bold'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-
-    this.loginTab.on('pointerdown', () => this._switchMode('login'));
-    this.registerTab.on('pointerdown', () => this._switchMode('register'));
-
-    // Error text
-    this.errorText = this.add.text(W / 2, panelY + 190, '', {
-      fontSize: '13px', fill: '#FF6B6B',
-      fontFamily: 'Arial', wordWrap: { width: 300 }
+    this.add.text(W / 2, 86, 'DEPLOY · BATTLE · CONQUER', {
+      fontSize: '10px', fill: '#886600', fontFamily: 'Arial', letterSpacing: 3
     }).setOrigin(0.5);
 
-    // Build initial form
-    this._buildForm();
-
+    // ── HTML overlay form (reliable in all browsers) ───────────────────────
+    this._buildOverlay();
     this.cameras.main.fadeIn(300);
-    audioSystem.resume();
     audioSystem.playTrack('battle_hymn');
   }
 
-  _switchMode(mode) {
-    if (this.mode === mode) return;
-    this.mode = mode;
-    this.loginTab.setStyle({ fill: mode === 'login' ? '#FFD700' : '#888888' });
-    this.registerTab.setStyle({ fill: mode === 'register' ? '#FFD700' : '#888888' });
-    this.errorText.setText('');
-    if (this.formDom) { this.formDom.destroy(); this.formDom = null; }
-    this._buildForm();
-  }
+  _buildOverlay() {
+    // Remove previous overlay
+    document.getElementById('bb-auth')?.remove();
 
-  _buildForm() {
-    const { width: W, height: H } = this.scale;
-    const panelY = H / 2 + 20;
+    const IS_REG = this.mode === 'register';
 
-    const inputStyle = `
-      width:260px; padding:10px 14px;
-      background:#1a1a2e; border:1px solid #3a3a6e; border-radius:6px;
-      color:#fff; font-size:15px; outline:none; box-sizing:border-box;
-    `;
-    const btnStyle = `
-      width:260px; padding:12px; border:none; border-radius:6px;
-      color:#fff; font-size:16px; font-weight:bold; cursor:pointer;
-    `;
+    const wrap = document.createElement('div');
+    wrap.id = 'bb-auth';
+    wrap.style.cssText = [
+      'position:fixed;top:0;left:0;right:0;bottom:0',
+      'display:flex;align-items:center;justify-content:center',
+      'z-index:200;pointer-events:none',
+    ].join(';');
 
-    const html = this.mode === 'register' ? `
-      <div style="display:flex;flex-direction:column;gap:12px;align-items:center;font-family:Arial;">
-        <input id="bb_username" type="text"     placeholder="Username (3+ chars)" style="${inputStyle}" maxlength="20" />
-        <input id="bb_email"    type="email"    placeholder="Email"               style="${inputStyle}" />
-        <input id="bb_pass"     type="password" placeholder="Password (6+ chars)" style="${inputStyle}" />
-        <button id="bb_submit" style="${btnStyle}background:linear-gradient(135deg,#27AE60,#1E8449);">
-          CREATE ACCOUNT
-        </button>
-      </div>
-    ` : `
-      <div style="display:flex;flex-direction:column;gap:12px;align-items:center;font-family:Arial;">
-        <input id="bb_email" type="email"    placeholder="Email"    style="${inputStyle}" />
-        <input id="bb_pass"  type="password" placeholder="Password" style="${inputStyle}" />
-        <button id="bb_submit" style="${btnStyle}background:linear-gradient(135deg,#2980B9,#1A5276);">
-          LOGIN
-        </button>
-      </div>
-    `;
+    const card = document.createElement('div');
+    card.style.cssText = [
+      'pointer-events:all',
+      'background:rgba(10,8,30,0.97)',
+      'border:1px solid #2e2e5e',
+      'border-radius:16px',
+      'padding:32px 28px 28px',
+      'display:flex;flex-direction:column;gap:14px;align-items:center',
+      'width:290px',
+      'box-shadow:0 0 40px rgba(80,0,160,0.4)',
+      'margin-top:60px',
+    ].join(';');
 
-    this.formDom = this.add.dom(W / 2, panelY - 30).createFromHTML(html);
+    // Tab bar
+    const tabs = document.createElement('div');
+    tabs.style.cssText = 'display:flex;gap:0;width:100%;border-radius:8px;overflow:hidden;margin-bottom:4px;';
 
-    // Wire up events after DOM is in place
-    this.time.delayedCall(50, () => {
-      document.getElementById('bb_submit')?.addEventListener('click',   () => this._submit());
-      document.getElementById('bb_pass')  ?.addEventListener('keydown', (e) => { if (e.key === 'Enter') this._submit(); });
+    ['login', 'register'].forEach(m => {
+      const t = document.createElement('button');
+      t.textContent = m === 'login' ? 'LOG IN' : 'SIGN UP';
+      t.style.cssText = [
+        'flex:1;padding:10px 0;border:none;cursor:pointer',
+        'font-size:13px;font-weight:bold;font-family:Arial',
+        'letter-spacing:1px;transition:background 0.2s',
+        m === this.mode
+          ? 'background:#2a1f6e;color:#FFD700;'
+          : 'background:#13112a;color:#555588;',
+      ].join(';');
+      t.onclick = () => { if (this.mode !== m) { this.mode = m; this._buildOverlay(); } };
+      tabs.appendChild(t);
     });
+    card.appendChild(tabs);
+
+    // Inputs
+    const inp = (id, type, placeholder) => {
+      const el = document.createElement('input');
+      el.id = id; el.type = type; el.placeholder = placeholder;
+      el.style.cssText = [
+        'width:100%;padding:12px 14px;box-sizing:border-box',
+        'background:#111128;border:1px solid #2e2e5e;border-radius:8px',
+        'color:#fff;font-size:15px;outline:none;font-family:Arial',
+        'transition:border-color 0.2s',
+      ].join(';');
+      el.onfocus = () => { el.style.borderColor = '#5555CC'; };
+      el.onblur  = () => { el.style.borderColor = '#2e2e5e'; };
+      return el;
+    };
+
+    if (IS_REG) card.appendChild(inp('bb_username', 'text', 'Username (3+ chars)'));
+    card.appendChild(inp('bb_email', 'email', 'Email address'));
+    const passEl = inp('bb_pass', 'password', 'Password (6+ chars)');
+    card.appendChild(passEl);
+
+    // Error label
+    const err = document.createElement('div');
+    err.id = 'bb-err';
+    err.style.cssText = 'color:#FF6B6B;font-size:13px;font-family:Arial;min-height:18px;text-align:center;width:100%;';
+    card.appendChild(err);
+
+    // Submit button
+    const btn = document.createElement('button');
+    btn.textContent = IS_REG ? 'CREATE ACCOUNT' : 'LOG IN';
+    btn.style.cssText = [
+      'width:100%;padding:14px;border:none;border-radius:8px',
+      IS_REG ? 'background:linear-gradient(135deg,#27AE60,#1A6B3C)' : 'background:linear-gradient(135deg,#2255CC,#1A3A8A)',
+      'color:#fff;font-size:16px;font-weight:bold;cursor:pointer',
+      'font-family:Arial;letter-spacing:1px',
+      'box-shadow:0 4px 14px rgba(0,0,0,0.5)',
+    ].join(';');
+    btn.onmouseenter = () => { btn.style.filter = 'brightness(1.15)'; };
+    btn.onmouseleave = () => { btn.style.filter = ''; };
+    card.appendChild(btn);
+
+    wrap.appendChild(card);
+    document.body.appendChild(wrap);
+    this._overlay = wrap;
+
+    // Events
+    btn.addEventListener('click', () => this._submit());
+    passEl.addEventListener('keydown', e => { if (e.key === 'Enter') this._submit(); });
+
+    // Focus first input
+    setTimeout(() => wrap.querySelector('input')?.focus(), 80);
   }
 
   async _submit() {
     const email    = document.getElementById('bb_email')?.value?.trim();
     const pass     = document.getElementById('bb_pass')?.value;
     const username = document.getElementById('bb_username')?.value?.trim();
+    const err      = document.getElementById('bb-err');
 
-    if (!email || !pass) { this.errorText.setText('Please fill all fields.'); return; }
+    if (!email || !pass) { if (err) err.textContent = 'Please fill all fields.'; return; }
+    if (err) err.textContent = 'Connecting…';
 
     const endpoint = this.mode === 'register' ? '/auth/register' : '/auth/login';
     const body     = this.mode === 'register'
       ? { email, password: pass, username }
       : { email, password: pass };
-
-    this.errorText.setText('Connecting…');
 
     try {
       const res  = await fetch(SERVER_URL + endpoint, {
@@ -134,11 +163,10 @@ export class AuthScene extends Phaser.Scene {
       const data = await res.json();
 
       if (!res.ok) {
-        this.errorText.setText(data.error || 'An error occurred.');
+        if (err) err.textContent = data.error || 'An error occurred.';
         return;
       }
 
-      // Persist credentials
       localStorage.setItem('bb_token',    data.token);
       localStorage.setItem('bb_username', data.username);
       localStorage.setItem('bb_gold',     String(data.gold));
@@ -150,16 +178,20 @@ export class AuthScene extends Phaser.Scene {
       socketManager.connect(data.token);
       audioSystem.playClick();
 
+      this._removeOverlay();
       this.cameras.main.fadeOut(300, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => {
-        this.scene.start('MainMenu');
-      });
+      this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('MainMenu'));
+
     } catch {
-      this.errorText.setText('Cannot reach server.\nMake sure the server is running on :3001');
+      if (err) err.textContent = 'Could not reach server. Try again.';
     }
   }
 
-  shutdown() {
-    if (this.formDom) { this.formDom.destroy(); this.formDom = null; }
+  _removeOverlay() {
+    this._overlay?.remove();
+    this._overlay = null;
+    document.getElementById('bb-auth')?.remove();
   }
+
+  shutdown() { this._removeOverlay(); }
 }
