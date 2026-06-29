@@ -22,468 +22,418 @@ export class MainMenuScene extends Phaser.Scene {
     this._drawBattleBar();
     this._drawNavBar();
     this._buildInviteContainer();
+    this._startAmbientParticles();
 
     const token = this.registry.get('token');
     if (token && !socketManager.isConnected()) socketManager.connect(token);
     socketManager.on('friend_invite', (d) => this._onFriendInvite(d));
 
-    this.cameras.main.fadeIn(300);
+    this.cameras.main.fadeIn(380);
     audioSystem.playTrack('battle_hymn');
   }
 
-  // ── BACKGROUND: teal diamond quilted ──────────────────────────────────────
+  // ── BACKGROUND ────────────────────────────────────────────────────────────
   _drawBackground() {
     const { W, H } = this;
     const g = this.add.graphics();
 
-    // Base teal
-    g.fillStyle(0x186b54);
-    g.fillRect(0, 0, W, H);
+    // Deep teal base
+    g.fillStyle(0x0E5A46); g.fillRect(0, 0, W, H);
 
-    // Diamond grid via two sets of crossing diagonals
-    const S = 46;
-    g.lineStyle(1.5, 0x0d5040, 0.9);
+    // Radial-ish glow center (castle area)
+    g.fillStyle(0x1A7A5E, 0.6); g.fillEllipse(W / 2, H * 0.42, W * 1.1, H * 0.55);
+    g.fillStyle(0x22906E, 0.3); g.fillEllipse(W / 2, H * 0.42, W * 0.7, H * 0.38);
+
+    // Diamond quilted grid
+    const S = 44, tG = this.add.graphics();
+    tG.lineStyle(1.2, 0x0A4A38, 0.85);
     for (let i = -H - S; i < W + H + S; i += S) {
-      g.lineBetween(i, 0, i + H * 2, H * 2);
-      g.lineBetween(i + H * 2, 0, i, H * 2);
+      tG.lineBetween(i, 0, i + H * 2, H * 2);
+      tG.lineBetween(i + H * 2, 0, i, H * 2);
     }
-
-    // Subtle highlight lines (offset by 2px to give 3-D "stitch" illusion)
-    const hg = this.add.graphics();
-    hg.lineStyle(0.5, 0x2a8a6e, 0.28);
+    // Subtle second grid offset for "stitch" depth
+    const tG2 = this.add.graphics();
+    tG2.lineStyle(0.5, 0x2AA880, 0.20);
     for (let i = -H - S + 2; i < W + H + S; i += S) {
-      hg.lineBetween(i, 0, i + H * 2, H * 2);
-      hg.lineBetween(i + H * 2, 0, i, H * 2);
+      tG2.lineBetween(i, 0, i + H * 2, H * 2);
+      tG2.lineBetween(i + H * 2, 0, i, H * 2);
     }
 
-    // Dark top gradient bar behind resource bar
-    const tg = this.add.graphics();
-    tg.fillStyle(0x000000, 0.55);
-    tg.fillRect(0, 0, W, 54);
+    // Dark top strip for resource bar
+    const topG = this.add.graphics();
+    topG.fillStyle(0x000000, 0.62); topG.fillRect(0, 0, W, 58);
+    topG.lineStyle(1, 0x0A6A4E, 0.5); topG.lineBetween(0, 58, W, 58);
   }
 
   // ── TOP RESOURCE BAR ──────────────────────────────────────────────────────
   _drawTopBar() {
     const { W } = this;
 
-    // ─ Trophy section ─────────────────────────────────────────────────────
-    this._drawTrophyIcon(20, 17);
+    // Trophy icon + count
+    this._drawTrophyIcon(18, 15);
+    const aG = this.add.graphics().setDepth(2);
+    aG.fillStyle(0x1A44BB); aG.fillRoundedRect(36, 5, 26, 19, 4);
+    this.add.text(49, 14, '14', { fontSize: '11px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(0.5).setDepth(3);
+    this.add.text(65, 12, String(this.trophies), { fontSize: '17px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold' }).setDepth(2);
 
-    // Arena level badge (left of trophy count)
-    const arenaBg = this.add.graphics().setDepth(2);
-    arenaBg.fillStyle(0x2255BB);
-    arenaBg.fillRoundedRect(36, 6, 26, 18, 4);
-    this.add.text(49, 15, '14', {
-      fontSize: '11px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(3);
-
-    this.add.text(66, 14, String(this.trophies), {
-      fontSize: '16px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setDepth(2);
-
-    // XP progress bar
-    const progG = this.add.graphics().setDepth(2);
-    progG.fillStyle(0x0a1a10, 0.8);
-    progG.fillRoundedRect(36, 28, 100, 8, 3);
-    progG.fillStyle(0x4499FF);
-    progG.fillRoundedRect(36, 28, 60, 8, 3);
-
-    // ─ Gold section ───────────────────────────────────────────────────────
-    const gx = W * 0.44;
-    const goldG = this.add.graphics().setDepth(2);
-    goldG.fillStyle(0xFFCC00);
-    goldG.fillCircle(gx, 22, 11);
-    goldG.fillStyle(0xFFAA00);
-    goldG.fillCircle(gx - 1, 21, 8);
-    goldG.fillStyle(0xFFEE44);
-    goldG.fillCircle(gx, 22, 5);
-
-    this.goldText = this.add.text(gx + 14, 13, this._fmt(this.gold), {
-      fontSize: '15px', fill: '#FFE566', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setDepth(2);
-    this.add.text(gx + 14 + this.goldText.width + 3, 15, '+', {
-      fontSize: '12px', fill: '#AAAAAA', fontFamily: 'Arial'
-    }).setDepth(2).setInteractive({ useHandCursor: true });
+    // XP bar
+    const xpG = this.add.graphics().setDepth(2);
+    xpG.fillStyle(0x000000, 0.7); xpG.fillRoundedRect(36, 28, 98, 9, 3);
+    xpG.fillStyle(0x4499FF);      xpG.fillRoundedRect(37, 29, 58, 7, 3);
+    xpG.fillStyle(0xAADDFF, 0.4); xpG.fillRoundedRect(37, 29, 22, 4, 2);
 
     // Dividers
     const dvG = this.add.graphics().setDepth(2);
-    dvG.lineStyle(1, 0x1a5540, 0.7);
-    dvG.lineBetween(W * 0.38, 4, W * 0.38, 48);
-    dvG.lineBetween(W * 0.7, 4, W * 0.7, 48);
+    dvG.lineStyle(1, 0x0A6A4E, 0.6);
+    dvG.lineBetween(W * 0.38, 3, W * 0.38, 52);
+    dvG.lineBetween(W * 0.70, 3, W * 0.70, 52);
 
-    // ─ Gems section ───────────────────────────────────────────────────────
+    // Gold
+    const gx = W * 0.44;
+    this._drawGoldIcon(gx, 22);
+    this.goldText = this.add.text(gx + 15, 12, this._fmt(this.gold),
+      { fontSize: '16px', fill: '#FFE566', fontFamily: 'Arial', fontStyle: 'bold' }).setDepth(2);
+    this.add.text(gx + 15 + this.goldText.width + 4, 14, '+',
+      { fontSize: '12px', fill: '#888888', fontFamily: 'Arial' }).setDepth(2).setInteractive({ useHandCursor: true });
+
+    // Gems
     const ex = W * 0.74;
     this._drawGemIcon(ex, 22);
-    this.add.text(ex + 14, 13, this._fmt(this.gems), {
-      fontSize: '15px', fill: '#66FF88', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setDepth(2);
-    this.add.text(ex + 14 + 42, 15, '+', {
-      fontSize: '12px', fill: '#AAAAAA', fontFamily: 'Arial'
-    }).setDepth(2).setInteractive({ useHandCursor: true });
+    this.add.text(ex + 14, 12, this._fmt(this.gems),
+      { fontSize: '16px', fill: '#66FF99', fontFamily: 'Arial', fontStyle: 'bold' }).setDepth(2);
+    this.add.text(ex + 55, 14, '+',
+      { fontSize: '12px', fill: '#888888', fontFamily: 'Arial' }).setDepth(2).setInteractive({ useHandCursor: true });
   }
 
   _drawTrophyIcon(x, y) {
     const g = this.add.graphics().setDepth(3);
     g.fillStyle(0xFFD700);
-    g.fillRect(x, y, 22, 16);
-    g.fillTriangle(x, y + 16, x + 11, y + 28, x + 22, y + 16);
-    g.fillRect(x + 7, y + 26, 8, 5);
-    g.fillRect(x + 4, y + 29, 14, 3);
-    g.fillStyle(0xCC9900);
-    g.fillRect(x, y, 22, 4);
+    g.fillRect(x, y, 22, 15); g.fillTriangle(x, y + 15, x + 11, y + 26, x + 22, y + 15);
+    g.fillRect(x + 7, y + 25, 8, 5); g.fillRect(x + 4, y + 28, 14, 3);
+    g.fillStyle(0xCC9900); g.fillRect(x, y, 22, 4);
+    g.fillStyle(0xFFEEAA, 0.4); g.fillRect(x + 2, y + 2, 8, 4);
+  }
+
+  _drawGoldIcon(x, y) {
+    const g = this.add.graphics().setDepth(2);
+    g.fillStyle(0xFFCC00); g.fillCircle(x, y, 11);
+    g.fillStyle(0xFFAA00); g.fillCircle(x - 1, y, 9);
+    g.fillStyle(0xFFEE44); g.fillCircle(x, y, 5);
+    g.fillStyle(0xFFFFAA, 0.5); g.fillCircle(x - 3, y - 3, 3);
   }
 
   _drawGemIcon(x, y) {
     const g = this.add.graphics().setDepth(3);
-    g.fillStyle(0x22CC44);
-    g.fillTriangle(x, y - 12, x + 10, y, x - 10, y);
-    g.fillTriangle(x - 10, y, x + 10, y, x, y + 12);
-    g.fillStyle(0x88FFAA, 0.55);
-    g.fillTriangle(x, y - 12, x + 4, y - 4, x - 4, y - 4);
+    g.fillStyle(0x00CC44); g.fillTriangle(x, y - 12, x + 11, y, x - 11, y);
+    g.fillTriangle(x - 11, y, x + 11, y, x, y + 12);
+    g.fillStyle(0x88FFAA, 0.55); g.fillTriangle(x, y - 12, x + 4, y - 3, x - 4, y - 3);
   }
 
   // ── PROFILE ROW ───────────────────────────────────────────────────────────
   _drawProfileRow() {
     const { W } = this;
-    const ROW_Y = 56;
+    const RY = 62;
 
-    // ─ Avatar frame ─────────────────────────────────────────────────────
+    // Avatar background
     const avG = this.add.graphics().setDepth(2);
-    avG.fillStyle(0x1a2a4a);
-    avG.fillRoundedRect(6, ROW_Y, 52, 52, 8);
-    avG.lineStyle(2, 0x4488CC, 0.9);
-    avG.strokeRoundedRect(6, ROW_Y, 52, 52, 8);
+    avG.fillStyle(0x0E2030); avG.fillRoundedRect(6, RY, 54, 54, 9);
+    avG.lineStyle(2.5, 0x4499DD, 0.9); avG.strokeRoundedRect(6, RY, 54, 54, 9);
+    // Helmet figure
+    avG.fillStyle(0xBBBBBB); avG.fillCircle(33, RY + 17, 13);
+    avG.fillStyle(0x555555); avG.fillRect(21, RY + 9, 24, 15);
+    avG.fillStyle(0xBBBBBB); avG.fillRect(26, RY + 5, 14, 9);
+    avG.fillStyle(0x1A44AA); avG.fillRect(21, RY + 29, 24, 18);
+    // Level badge
+    avG.fillStyle(0xFFD700); avG.fillRoundedRect(6, RY + 42, 54, 14, 7);
+    avG.fillStyle(0xCC9900); avG.fillRoundedRect(6, RY + 48, 54, 8, 7);
+    this.add.text(33, RY + 49, 'Lv 14', { fontSize: '9px', fill: '#1A0A00', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(0.5).setDepth(3);
 
-    // Tiny knight face
-    avG.fillStyle(0xBBBBBB);
-    avG.fillCircle(32, ROW_Y + 17, 13);
-    avG.fillStyle(0x666666);
-    avG.fillRect(20, ROW_Y + 10, 24, 16);
-    avG.fillStyle(0xBBBBBB);
-    avG.fillRect(26, ROW_Y + 6, 12, 8);
-    avG.fillStyle(0x2244AA);
-    avG.fillRect(20, ROW_Y + 30, 24, 18);
-
-    // Level bar at bottom of avatar
-    avG.fillStyle(0xFFD700);
-    avG.fillRoundedRect(6, ROW_Y + 42, 52, 14, 6);
-    this.add.text(32, ROW_Y + 49, 'Lv 14', {
-      fontSize: '9px', fill: '#1A0A00', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(3);
-
-    // Player name + clan
-    this.add.text(64, ROW_Y + 6, this.username, {
-      fontSize: '16px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 2
+    // Name + clan
+    this.add.text(66, RY + 5, this.username, {
+      fontSize: '17px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold', stroke: '#000000', strokeThickness: 2
     }).setDepth(2);
-    this.add.text(64, ROW_Y + 27, '♦ Battle Bros Club', {
-      fontSize: '12px', fill: '#88DDFF', fontFamily: 'Arial'
-    }).setDepth(2);
+    this.add.text(66, RY + 26, '♦ Battle Bros Club', { fontSize: '12px', fill: '#66CCFF', fontFamily: 'Arial' }).setDepth(2);
 
-    // ─ Top-right icon buttons ────────────────────────────────────────────
-    const btnDefs = [
-      { icon: '👤', x: W - 110, cb: () => this._showInvite() },
-      { icon: '📋', x: W - 68,  badge: true, cb: () => {} },
-      { icon: '☰',  x: W - 26,  cb: () => this._logout() },
+    // Battle Pass
+    const PX = W - 164, PW = 72;
+    const pG = this.add.graphics().setDepth(2);
+    pG.fillStyle(0xBB8800); pG.fillRoundedRect(PX, RY, PW, 36, 7);
+    pG.fillStyle(0xFFCC00); pG.fillRoundedRect(PX, RY, PW, 26, 7);
+    pG.fillStyle(0xFFEE88, 0.3); pG.fillRoundedRect(PX + 4, RY + 2, PW - 8, 10, 5);
+    this.add.text(PX + PW / 2, RY + 10, '⚔ PASS', { fontSize: '11px', fill: '#1A0A00', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(0.5).setDepth(3);
+    this.add.text(PX + PW / 2, RY + 25, '4h 30m', { fontSize: '9px',  fill: '#3A1A00', fontFamily: 'Arial' }).setOrigin(0.5).setDepth(3);
+
+    // Icon buttons (social, clipboard, menu)
+    const btns = [
+      { icon: '👤', x: W - 112, cb: () => this._showInvite() },
+      { icon: '📋', x: W - 70,  badge: true, cb: () => {} },
+      { icon: '☰',  x: W - 28,  cb: () => this._logout() },
     ];
-    for (const b of btnDefs) {
+    for (const b of btns) {
       const bg = this.add.graphics().setDepth(2);
-      bg.fillStyle(0x0d2218, 0.9);
-      bg.fillRoundedRect(b.x - 18, ROW_Y, 36, 36, 6);
-      bg.lineStyle(1, 0x2a5a3a, 0.7);
-      bg.strokeRoundedRect(b.x - 18, ROW_Y, 36, 36, 6);
-      this.add.text(b.x, ROW_Y + 18, b.icon, {
-        fontSize: '18px', fill: '#FFFFFF', fontFamily: 'Arial'
-      }).setOrigin(0.5).setDepth(3).setInteractive({ useHandCursor: true }).on('pointerdown', () => { audioSystem.playClick(); b.cb(); });
+      bg.fillStyle(0x0A1E18, 0.92); bg.fillRoundedRect(b.x - 18, RY, 36, 36, 7);
+      bg.lineStyle(1.5, 0x1A6A4E, 0.7); bg.strokeRoundedRect(b.x - 18, RY, 36, 36, 7);
+      this.add.text(b.x, RY + 18, b.icon, { fontSize: '18px', fill: '#FFFFFF', fontFamily: 'Arial' })
+        .setOrigin(0.5).setDepth(3)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => { audioSystem.playClick(); b.cb(); });
       if (b.badge) {
-        const bdg = this.add.graphics().setDepth(4);
-        bdg.fillStyle(0xDD1111); bdg.fillCircle(b.x + 14, ROW_Y + 2, 7);
-        this.add.text(b.x + 14, ROW_Y + 2, '!', {
-          fontSize: '10px', fill: '#FFF', fontFamily: 'Arial', fontStyle: 'bold'
-        }).setOrigin(0.5).setDepth(5);
+        const bdG = this.add.graphics().setDepth(4);
+        bdG.fillStyle(0xDD1111); bdG.fillCircle(b.x + 14, RY + 1, 7);
+        this.add.text(b.x + 14, RY + 1, '!', { fontSize: '10px', fill: '#FFF', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(0.5).setDepth(5);
       }
     }
-
-    // ─ Battle Pass button ─────────────────────────────────────────────────
-    const passX = W - 156, passW = 36;
-    const passG = this.add.graphics().setDepth(2);
-    passG.fillStyle(0xCC9900);
-    passG.fillRoundedRect(passX - passW, ROW_Y, passW * 2, 36, 6);
-    passG.fillStyle(0xFFCC00);
-    passG.fillRoundedRect(passX - passW, ROW_Y, passW * 2, 26, 6);
-    this.add.text(passX, ROW_Y + 10, '⚔ PASS', {
-      fontSize: '11px', fill: '#1A0A00', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(3);
-    this.add.text(passX, ROW_Y + 25, '4h 30m', {
-      fontSize: '9px', fill: '#3A1A00', fontFamily: 'Arial'
-    }).setOrigin(0.5).setDepth(3);
   }
 
   // ── CASTLE ARENA ─────────────────────────────────────────────────────────
   _drawCastleArena() {
     const { W, H } = this;
-    const cx = W / 2;
-    const cy = H * 0.415;
+    const cx = W / 2, cy = H * 0.42;
 
-    // ─ Sky / atmosphere behind castle ─────────────────────────────────────
-    const sky = this.add.graphics().setDepth(0);
-    // Dark sky gradient (simulated with stacked rects at decreasing alpha)
-    for (let i = 0; i < 12; i++) {
-      const yy = H * 0.11 + i * 28;
-      sky.fillStyle(0x000818, 0.18 - i * 0.012);
-      sky.fillRect(0, yy, W, 30);
+    // Sky atmosphere behind castle
+    const skyG = this.add.graphics().setDepth(0);
+    // Radial gradient (stacked translucent rects narrowing upward)
+    for (let i = 0; i < 14; i++) {
+      const w2 = W * (0.95 - i * 0.04), yy = H * 0.12 + i * 24;
+      skyG.fillStyle(0x001028, 0.15 - i * 0.008);
+      skyG.fillRect(cx - w2 / 2, yy, w2, 26);
     }
-    // Star field
-    for (let i = 0; i < 50; i++) {
-      const sx = Math.random() * W;
-      const sy = H * 0.11 + Math.random() * H * 0.28;
-      sky.fillStyle(0xFFFFFF, 0.06 + Math.random() * 0.22);
-      sky.fillRect(sx, sy, 1, 1);
+    // Stars
+    for (let i = 0; i < 60; i++) {
+      const sx = (Math.abs(Math.sin(i * 73.1)) * W);
+      const sy = H * 0.12 + (Math.abs(Math.cos(i * 37.7)) * H * 0.28);
+      skyG.fillStyle(0xFFFFFF, 0.06 + Math.abs(Math.sin(i * 11)) * 0.22);
+      skyG.fillRect(sx, sy, 1.5, 1.5);
     }
-    // Horizon glow behind castle
-    sky.fillStyle(0x1A3A6A, 0.28); sky.fillEllipse(cx, cy + 30, 320, 120);
-    sky.fillStyle(0x2255AA, 0.12); sky.fillEllipse(cx, cy + 20, 260, 90);
+    // Castle glow halos
+    skyG.fillStyle(0x1A4A8A, 0.22); skyG.fillEllipse(cx, cy + 22, 340, 120);
+    skyG.fillStyle(0x2266BB, 0.10); skyG.fillEllipse(cx, cy + 10, 240, 80);
+    skyG.fillStyle(0x44AAFF, 0.05); skyG.fillEllipse(cx, cy - 20, 160, 60);
 
-    // ─ Ground shadow ──────────────────────────────────────────────────────
-    const bg = this.add.graphics().setDepth(1);
-    bg.fillStyle(0x000000, 0.3);
-    bg.fillEllipse(cx, cy + 120, 320, 70);
+    // Ground shadow
+    const islandG = this.add.graphics().setDepth(1);
+    islandG.fillStyle(0x000000, 0.35); islandG.fillEllipse(cx + 6, cy + 118, 340, 72);
 
-    // ─ Grass island ───────────────────────────────────────────────────────
-    bg.fillStyle(0x1f6b2a);
-    bg.fillEllipse(cx, cy + 112, 298, 60);
-    bg.fillStyle(0x2a8a36);
-    bg.fillEllipse(cx, cy + 107, 276, 50);
+    // Grass island (3 layers)
+    islandG.fillStyle(0x0E5A1A); islandG.fillEllipse(cx, cy + 114, 306, 62);
+    islandG.fillStyle(0x1A7828); islandG.fillEllipse(cx, cy + 109, 282, 52);
+    islandG.fillStyle(0x22942E, 0.6); islandG.fillEllipse(cx, cy + 105, 250, 40);
 
-    // Moat (blue water ring)
-    bg.lineStyle(9, 0x1155CC, 0.7);
-    bg.strokeEllipse(cx, cy + 107, 276, 50);
-    bg.lineStyle(4, 0x4488FF, 0.3);
-    bg.strokeEllipse(cx, cy + 107, 260, 44);
+    // Moat
+    islandG.lineStyle(10, 0x1155DD, 0.65); islandG.strokeEllipse(cx, cy + 110, 290, 54);
+    islandG.lineStyle(4,  0x4488FF, 0.28); islandG.strokeEllipse(cx, cy + 109, 272, 46);
+    islandG.fillStyle(0x0033AA, 0.18);     islandG.fillEllipse(cx, cy + 110, 280, 50);
 
-    // ─ Castle platform ────────────────────────────────────────────────────
-    bg.fillStyle(0x6a5e50);
-    bg.fillEllipse(cx, cy + 100, 230, 40);
-    bg.fillStyle(0x7a6e5e);
-    bg.fillEllipse(cx, cy + 96, 215, 34);
+    // Castle platform
+    islandG.fillStyle(0x62584E); islandG.fillEllipse(cx, cy + 100, 238, 42);
+    islandG.fillStyle(0x726860); islandG.fillEllipse(cx, cy + 96,  222, 35);
+    islandG.fillStyle(0x887E72, 0.3); islandG.fillEllipse(cx - 20, cy + 90, 100, 18);
 
-    // ─ Connecting wall ────────────────────────────────────────────────────
-    const wall = this.add.graphics().setDepth(2);
-    wall.fillStyle(0x8a8278);
-    wall.fillRect(cx - 84, cy - 10, 168, 108);
-    // Wall depth (bottom)
-    wall.fillStyle(0x5a5650);
-    wall.fillRect(cx - 84, cy + 82, 168, 26);
-    // Wall highlight (top)
-    wall.fillStyle(0xA09890, 0.5);
-    wall.fillRect(cx - 84, cy - 10, 168, 14);
-
-    // Stone lines on wall
-    wall.lineStyle(1, 0x6e6660, 0.5);
+    // Connecting wall
+    const wallG = this.add.graphics().setDepth(2);
+    wallG.fillStyle(0x7A7268); wallG.fillRect(cx - 86, cy - 10, 172, 112);
+    wallG.fillStyle(0x4A484A, 0.7); wallG.fillRect(cx - 86, cy + 84, 172, 28);
+    wallG.fillStyle(0x9A9288, 0.5); wallG.fillRect(cx - 86, cy - 10, 172, 14);
+    // Wall stone lines
     for (let i = 1; i < 5; i++) {
-      wall.lineBetween(cx - 84, cy - 10 + i * 22, cx + 84, cy - 10 + i * 22);
+      wallG.lineStyle(1, 0x5A5450, 0.4);
+      wallG.lineBetween(cx - 86, cy - 10 + i * 24, cx + 86, cy - 10 + i * 24);
     }
+    // Banner on wall
+    wallG.fillStyle(0x0E3A99); wallG.fillRect(cx - 48, cy + 14, 96, 46);
+    wallG.fillStyle(0x1A55CC); wallG.fillRect(cx - 43, cy + 18, 86, 38);
+    wallG.fillStyle(0x2266EE, 0.4); wallG.fillRect(cx - 41, cy + 18, 30, 12);
+    // Gold diamond on banner
+    wallG.fillStyle(0xFFD700);
+    wallG.fillTriangle(cx, cy + 20, cx + 16, cy + 40, cx, cy + 56);
+    wallG.fillTriangle(cx, cy + 20, cx - 16, cy + 40, cx, cy + 56);
+    wallG.fillStyle(0xFFAA00); wallG.fillCircle(cx, cy + 38, 6);
+    wallG.fillStyle(0xFFEE88, 0.4); wallG.fillCircle(cx - 2, cy + 35, 3);
 
-    // Blue banner on wall
-    wall.fillStyle(0x1244AA);
-    wall.fillRect(cx - 46, cy + 16, 92, 44);
-    wall.fillStyle(0x1A55CC);
-    wall.fillRect(cx - 41, cy + 20, 82, 36);
+    // Guard towers and king tower
+    this._drawTower(cx - 86, cy - 4,  48, 90,  false);
+    this._drawTower(cx + 86, cy - 4,  48, 90,  false);
+    this._drawTower(cx,      cy - 60, 66, 130, true);
 
-    // Gold diamond emblem on banner
-    wall.fillStyle(0xFFD700);
-    wall.fillTriangle(cx, cy + 22, cx + 13, cy + 38, cx, cy + 54);
-    wall.fillTriangle(cx, cy + 22, cx - 13, cy + 38, cx, cy + 54);
-    wall.fillStyle(0xFFAA00);
-    wall.fillCircle(cx, cy + 38, 5);
+    // Decorative balloons
+    this._spawnBalloons(cx - 92, cy - 124);
 
-    // ─ Guard tower LEFT ───────────────────────────────────────────────────
-    this._drawTower(cx - 84, cy - 4, 46, 88, false);
-
-    // ─ Guard tower RIGHT ──────────────────────────────────────────────────
-    this._drawTower(cx + 84, cy - 4, 46, 88, false);
-
-    // ─ King tower (center, tallest) ───────────────────────────────────────
-    this._drawTower(cx, cy - 58, 62, 124, true);
-
-    // ─ Balloons (decorative) ──────────────────────────────────────────────
-    this._spawnBalloons(cx - 90, cy - 120);
-
-    // ─ Chest on the right (claimable) ────────────────────────────────────
-    this._drawClaimChest(cx + 148, cy + 24);
+    // Claim chest
+    this._drawClaimChest(cx + 152, cy + 20);
   }
 
   _drawTower(x, y, w, h, isKing) {
     const g = this.add.graphics().setDepth(isKing ? 4 : 3);
+    const SIDE = 11;
+
+    // Drop shadow
+    g.fillStyle(0x000000, 0.28); g.fillEllipse(x + SIDE / 2, y + 16, w + 24, 14);
+
+    // Right side depth face
+    g.fillStyle(0x3A3830); g.fillRect(x + w / 2, y - h, SIDE, h + 8);
 
     // Tower body
-    g.fillStyle(0x9a9082);
-    g.fillRect(x - w / 2, y - h, w, h);
-
+    g.fillStyle(0x908880); g.fillRect(x - w / 2, y - h, w, h);
     // Left face highlight
-    g.fillStyle(0xB0A496, 0.55);
-    g.fillRect(x - w / 2, y - h, w * 0.32, h);
-
+    g.fillStyle(0xB8B0A8, 0.6); g.fillRect(x - w / 2, y - h, w * 0.28, h);
     // Right face shadow
-    g.fillStyle(0x50504A, 0.5);
-    g.fillRect(x + w * 0.18, y - h, w * 0.32, h);
+    g.fillStyle(0x383430, 0.55); g.fillRect(x + w * 0.22, y - h, w * 0.28, h);
 
-    // Horizontal mortar lines
-    g.lineStyle(1, 0x6e6860, 0.5);
-    const rows = isKing ? 7 : 5;
-    for (let i = 1; i <= rows; i++) {
-      g.lineBetween(x - w / 2, y - h + i * (h / rows), x + w / 2, y - h + i * (h / rows));
+    // Stone brick grid
+    const rows = Math.floor(h / 14);
+    for (let i = 0; i <= rows; i++) {
+      g.lineStyle(1, 0x5A5650, 0.4);
+      g.lineBetween(x - w / 2, y - h + i * 14, x + w / 2, y - h + i * 14);
     }
 
     // Blue ribbon band
     const ry = y - h * 0.52;
-    g.fillStyle(0x1244AA);
-    g.fillRect(x - w / 2, ry - 7, w, 14);
-    // Gold diamond on ribbon
+    g.fillStyle(0x0E3A99); g.fillRect(x - w / 2, ry - 8, w, 16);
+    g.fillStyle(0x1A55CC); g.fillRect(x - w / 2, ry - 7, w - 2, 12);
+    g.fillStyle(0x2266EE, 0.3); g.fillRect(x - w / 2 + 2, ry - 6, 14, 6);
+    // Diamond emblem
     g.fillStyle(0xFFD700);
-    g.fillTriangle(x, ry - 7, x + 7, ry, x, ry + 7);
-    g.fillTriangle(x, ry - 7, x - 7, ry, x, ry + 7);
+    g.fillTriangle(x, ry - 7, x + 8, ry, x, ry + 7);
+    g.fillTriangle(x, ry - 7, x - 8, ry, x, ry + 7);
+    g.fillStyle(0xFFEE88, 0.5); g.fillCircle(x, ry, 2);
 
     // Battlements
-    const btCount = isKing ? 5 : 4;
-    const btW = (w - 4) / btCount * 0.6;
+    const btCount = isKing ? 6 : 4;
+    const btW = (w - 4) / btCount * 0.58;
     const btGap = (w - 4 - btCount * btW) / (btCount - 1);
     for (let i = 0; i < btCount; i++) {
       const bx = x - w / 2 + 2 + i * (btW + btGap);
-      g.fillStyle(0x9a9082);
-      g.fillRect(bx, y - h - 14, btW, 16);
-      g.fillStyle(0xB0A496, 0.4);
-      g.fillRect(bx, y - h - 14, btW, 4);
-      g.fillStyle(0x50504A, 0.3);
-      g.fillRect(bx + btW * 0.6, y - h - 14, btW * 0.4, 16);
+      g.fillStyle(0x908880); g.fillRect(bx, y - h - 15, btW, 17);
+      // 3D top face
+      g.fillStyle(0xB8B0A8, 0.5); g.fillRect(bx, y - h - 15, btW, 5);
+      g.fillStyle(0x383430, 0.4); g.fillRect(bx + btW * 0.65, y - h - 15, btW * 0.35, 17);
+      // Right side
+      g.fillStyle(0x3A3830, 0.5); g.fillRect(bx + btW, y - h - 15, SIDE * 0.5, 17);
     }
-
-    // Gap fill between battlements top
-    g.fillStyle(0x050505, 0.5);
+    // Fill battlement gaps (sky showing through)
+    g.fillStyle(0x000000, 0.6);
     for (let i = 0; i < btCount - 1; i++) {
       const bx = x - w / 2 + 2 + i * (btW + btGap) + btW;
-      g.fillRect(bx, y - h - 14, btGap, 14);
+      g.fillRect(bx, y - h - 15, btGap, 15);
     }
 
+    // Base platform
+    g.fillStyle(0x4A4840); g.fillRect(x - w / 2 - 6, y + 8, w + 12 + SIDE, 13);
+    g.fillStyle(0x787068, 0.5); g.fillRect(x - w / 2 - 5, y + 8, w + 10, 5);
+
     if (isKing) {
-      // Gold crown
-      g.fillStyle(0xFFD700);
-      const kx = x, ky = y - h - 16;
-      // Crown base
-      g.fillRect(kx - 18, ky, 36, 12);
+      // Crown
+      const kx = x, ky = y - h - 17;
+      g.fillStyle(0xCC9900); g.fillRect(kx - 20, ky + 2, 42, 14);
+      g.fillStyle(0xFFD700); g.fillRect(kx - 19, ky, 40, 14);
+      g.fillStyle(0xFFEE88, 0.35); g.fillRect(kx - 18, ky + 1, 16, 5);
       // 3 spikes
-      g.fillTriangle(kx - 16, ky, kx - 22, ky - 18, kx - 10, ky);
-      g.fillTriangle(kx, ky, kx, ky - 22, kx + 8, ky);
-      g.fillTriangle(kx + 16, ky, kx + 22, ky - 18, kx + 8, ky);
-      // Gems on spikes
+      g.fillStyle(0xFFD700);
+      g.fillTriangle(kx - 17, ky, kx - 24, ky - 20, kx - 9, ky);
+      g.fillTriangle(kx,      ky, kx,      ky - 25, kx + 9, ky);
+      g.fillTriangle(kx + 17, ky, kx + 24, ky - 20, kx + 9, ky);
+      // Spike gems
       g.fillStyle(0xFF2200);
-      g.fillCircle(kx - 18, ky - 14, 4);
-      g.fillCircle(kx + 2, ky - 18, 4);
-      g.fillCircle(kx + 18, ky - 14, 4);
-      // Crown highlight
-      g.fillStyle(0xFFEE88, 0.4);
-      g.fillRect(kx - 16, ky + 1, 32, 4);
+      g.fillCircle(kx - 20, ky - 16, 5); g.fillCircle(kx + 1, ky - 20, 5); g.fillCircle(kx + 20, ky - 16, 5);
+      g.fillStyle(0xFF8888, 0.5);
+      g.fillCircle(kx - 20, ky - 16, 2); g.fillCircle(kx + 1, ky - 20, 2); g.fillCircle(kx + 20, ky - 16, 2);
     }
   }
 
   _spawnBalloons(startX, startY) {
-    const configs = [
-      { x: startX, y: startY, r: 22, col: 0xFFDD00 },
-      { x: startX - 18, y: startY - 30, r: 17, col: 0xFF6600 },
-    ];
-    configs.forEach(b => {
+    [
+      { x: startX,      y: startY,      r: 23, col: 0xFFDD00 },
+      { x: startX - 20, y: startY - 34, r: 18, col: 0xFF6600 },
+    ].forEach(b => {
       const g = this.add.graphics().setDepth(5);
       g.fillStyle(b.col); g.fillCircle(b.x, b.y, b.r);
-      g.fillStyle(0xFFFFFF, 0.28); g.fillCircle(b.x - b.r * 0.3, b.y - b.r * 0.3, b.r * 0.38);
-      g.fillStyle(0x000000, 0.08); g.fillCircle(b.x + b.r * 0.2, b.y + b.r * 0.25, b.r * 0.25);
-      g.lineStyle(1, 0x886600, 0.7);
-      g.lineBetween(b.x, b.y + b.r, b.x + 4, b.y + b.r + 32);
-      this.tweens.add({ targets: g, y: -8, duration: 1600 + Math.random() * 700, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: Math.random() * 400 });
+      g.fillStyle(0xFFFFFF, 0.30); g.fillCircle(b.x - b.r * 0.32, b.y - b.r * 0.32, b.r * 0.40);
+      g.fillStyle(0x000000, 0.08); g.fillCircle(b.x + b.r * 0.22, b.y + b.r * 0.22, b.r * 0.25);
+      g.lineStyle(1, 0x886600, 0.6); g.lineBetween(b.x, b.y + b.r, b.x + 4, b.y + b.r + 34);
+      this.tweens.add({ targets: g, y: -9, duration: 1700 + Math.random() * 600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: Math.random() * 500 });
     });
   }
 
   _drawClaimChest(x, y) {
     const g = this.add.graphics().setDepth(4);
-    // Glow ring
-    g.fillStyle(0xFFAA00, 0.18); g.fillCircle(x, y, 38);
+    // Glow rings
+    g.fillStyle(0xFFAA00, 0.14); g.fillCircle(x, y, 44);
+    g.fillStyle(0xFFCC00, 0.08); g.fillCircle(x, y, 34);
     // Chest body
-    g.fillStyle(0x8B4513); g.fillRoundedRect(x - 26, y - 6, 52, 32, 5);
+    g.fillStyle(0x7A3A08); g.fillRoundedRect(x - 28, y - 4, 56, 34, 6);
+    g.fillStyle(0x553000, 0.5); g.fillRoundedRect(x - 28, y + 20, 56, 14, 6);
     // Lid
-    g.fillStyle(0xA0522D); g.fillRoundedRect(x - 26, y - 22, 52, 20, 5);
-    // Gold straps
-    g.fillStyle(0xFFD700); g.fillRect(x - 26, y - 4, 52, 8);
-    g.fillRect(x - 5, y - 22, 10, 54);
+    g.fillStyle(0xA0522A); g.fillRoundedRect(x - 28, y - 22, 56, 21, 6);
+    g.fillStyle(0xC0693A, 0.4); g.fillRoundedRect(x - 24, y - 20, 26, 9, 4);
+    // Gold bands
+    g.fillStyle(0xFFD700); g.fillRect(x - 28, y - 3, 56, 9);
+    g.fillRect(x - 6, y - 22, 12, 56);
+    g.fillStyle(0xFFEE88, 0.4); g.fillRect(x - 26, y - 2, 20, 4);
     // Lock
-    g.fillStyle(0xFFD700); g.fillCircle(x, y + 4, 8);
-    g.fillStyle(0x6a3000); g.fillCircle(x, y + 5, 4.5);
+    g.fillStyle(0xFFD700); g.fillCircle(x, y + 6, 9);
+    g.fillStyle(0x6A3000); g.fillCircle(x, y + 7, 5);
+    g.fillStyle(0xFFCC00, 0.4); g.fillCircle(x - 2, y + 4, 2.5);
 
-    // "CLAIM" button under chest
-    const claimBg = this.add.graphics().setDepth(4);
-    claimBg.fillStyle(0xFFCC00);
-    claimBg.fillRoundedRect(x - 32, y + 32, 64, 26, 6);
-    claimBg.fillStyle(0xFFAA00);
-    claimBg.fillRoundedRect(x - 32, y + 44, 64, 14, 6);
-    this.add.text(x, y + 45, 'CLAIM', {
+    // CLAIM button
+    const claimG = this.add.graphics().setDepth(4);
+    claimG.fillStyle(0xCC8800); claimG.fillRoundedRect(x - 34, y + 34, 68, 28, 7);
+    claimG.fillStyle(0xFFCC00); claimG.fillRoundedRect(x - 34, y + 34, 68, 20, 7);
+    claimG.fillStyle(0xFFEE88, 0.35); claimG.fillRoundedRect(x - 30, y + 36, 28, 8, 4);
+    this.add.text(x, y + 48, 'CLAIM', {
       fontSize: '13px', fill: '#3A1A00', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(5);
+    }).setOrigin(0.5).setDepth(5)
+      .setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => audioSystem.playClick());
   }
 
   // ── CHEST ROW ─────────────────────────────────────────────────────────────
   _drawChestRow() {
     const { W, H } = this;
     const rowY = H * 0.73;
-    const slotW = 62, slotH = 72;
+    const slotW = 64, slotH = 74;
     const slots = [
-      { type: 'ready',  label: '', color: 0x2ECC71 },
+      { type: 'ready',  label: '',       color: 0x2ECC71 },
       { type: 'silver', label: 'SILVER', color: 0xCCCCCC },
       { type: 'golden', label: 'GOLDEN', color: 0xFFD700 },
       { type: 'silver', label: 'SILVER', color: 0xCCCCCC },
     ];
-
-    const totalW = slots.length * slotW + (slots.length - 1) * 6;
+    const totalW = slots.length * slotW + (slots.length - 1) * 7;
     const sx = W / 2 - totalW / 2;
 
-    // Row container
+    // Row bg
     const rowBg = this.add.graphics().setDepth(2);
-    rowBg.fillStyle(0x000000, 0.42);
-    rowBg.fillRoundedRect(sx - 8, rowY - slotH / 2 - 6, totalW + 16, slotH + 12, 10);
-    rowBg.lineStyle(1, 0x1a4a2a, 0.5);
-    rowBg.strokeRoundedRect(sx - 8, rowY - slotH / 2 - 6, totalW + 16, slotH + 12, 10);
+    rowBg.fillStyle(0x000000, 0.45); rowBg.fillRoundedRect(sx - 10, rowY - slotH / 2 - 8, totalW + 20, slotH + 16, 12);
+    rowBg.lineStyle(1, 0x1A5A3A, 0.5); rowBg.strokeRoundedRect(sx - 10, rowY - slotH / 2 - 8, totalW + 20, slotH + 16, 12);
 
-    // Info "i" button
-    const iBg = this.add.graphics().setDepth(3);
-    iBg.fillStyle(0x0a2218, 0.9);
-    iBg.fillCircle(sx + totalW + 18, rowY + slotH / 2 - 4, 12);
-    iBg.lineStyle(1, 0x2a5a3a);
-    iBg.strokeCircle(sx + totalW + 18, rowY + slotH / 2 - 4, 12);
-    this.add.text(sx + totalW + 18, rowY + slotH / 2 - 4, 'i', {
-      fontSize: '13px', fill: '#AACCAA', fontFamily: 'Arial', fontStyle: 'italic'
-    }).setOrigin(0.5).setDepth(4);
+    // Info button
+    const iG = this.add.graphics().setDepth(3);
+    iG.fillStyle(0x0A2218, 0.9); iG.fillCircle(sx + totalW + 20, rowY + slotH / 2 - 4, 13);
+    iG.lineStyle(1.5, 0x2A6A4A); iG.strokeCircle(sx + totalW + 20, rowY + slotH / 2 - 4, 13);
+    this.add.text(sx + totalW + 20, rowY + slotH / 2 - 4, 'i',
+      { fontSize: '14px', fill: '#AACCAA', fontFamily: 'Arial', fontStyle: 'italic' }).setOrigin(0.5).setDepth(4);
 
     for (let i = 0; i < slots.length; i++) {
-      const cx = sx + i * (slotW + 6) + slotW / 2;
-      const sl = slots[i];
-      const sg = this.add.graphics().setDepth(3);
+      const chX = sx + i * (slotW + 7) + slotW / 2;
+      const sl  = slots[i];
+      const sG  = this.add.graphics().setDepth(3);
 
       if (sl.type === 'ready') {
-        sg.fillStyle(0x1a3a1a, 0.98);
-        sg.fillRoundedRect(cx - slotW / 2, rowY - slotH / 2, slotW, slotH, 7);
-        sg.lineStyle(2, 0x2ECC71, 0.9);
-        sg.strokeRoundedRect(cx - slotW / 2, rowY - slotH / 2, slotW, slotH, 7);
-        // Checkmark
-        sg.lineStyle(4, 0x2ECC71, 1);
-        sg.beginPath();
-        sg.moveTo(cx - 12, rowY);
-        sg.lineTo(cx - 3, rowY + 10);
-        sg.lineTo(cx + 14, rowY - 12);
-        sg.strokePath();
+        sG.fillStyle(0x0A2A0A, 0.97); sG.fillRoundedRect(chX - slotW / 2, rowY - slotH / 2, slotW, slotH, 9);
+        sG.lineStyle(2.5, 0x2ECC71, 0.9); sG.strokeRoundedRect(chX - slotW / 2, rowY - slotH / 2, slotW, slotH, 9);
+        // Inner glow
+        sG.lineStyle(5, 0x2ECC71, 0.14); sG.strokeRoundedRect(chX - slotW / 2 - 2, rowY - slotH / 2 - 2, slotW + 4, slotH + 4, 11);
+        // Checkmark (thick)
+        sG.lineStyle(5, 0x2ECC71, 1);
+        sG.beginPath();
+        sG.moveTo(chX - 13, rowY + 1);
+        sG.lineTo(chX - 3, rowY + 12);
+        sG.lineTo(chX + 15, rowY - 13);
+        sG.strokePath();
       } else {
-        sg.fillStyle(0x0e1e14, 0.95);
-        sg.fillRoundedRect(cx - slotW / 2, rowY - slotH / 2, slotW, slotH, 7);
-        sg.lineStyle(1, 0x2a3a2a, 0.6);
-        sg.strokeRoundedRect(cx - slotW / 2, rowY - slotH / 2, slotW, slotH, 7);
-        this._drawChestMini(sg, cx, rowY - 6, sl.color);
-        this.add.text(cx, rowY + slotH / 2 - 12, sl.label, {
+        sG.fillStyle(0x0C1C12, 0.96); sG.fillRoundedRect(chX - slotW / 2, rowY - slotH / 2, slotW, slotH, 9);
+        sG.lineStyle(1, 0x2A3A2A, 0.55); sG.strokeRoundedRect(chX - slotW / 2, rowY - slotH / 2, slotW, slotH, 9);
+        this._drawChestMini(sG, chX, rowY - 6, sl.color);
+        this.add.text(chX, rowY + slotH / 2 - 11, sl.label, {
           fontSize: '8px', fill: sl.color === 0xFFD700 ? '#FFD700' : '#BBBBBB',
           fontFamily: 'Arial', fontStyle: 'bold'
         }).setOrigin(0.5).setDepth(4);
@@ -492,13 +442,13 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   _drawChestMini(g, x, y, color) {
-    const cw = 36, ch = 24;
-    g.fillStyle(0x7a3a0a); g.fillRoundedRect(x - cw / 2, y, cw, ch, 4);
-    g.fillStyle(0x9a4a10); g.fillRoundedRect(x - cw / 2, y - 13, cw, 16, 4);
-    g.fillStyle(color);   g.fillRect(x - cw / 2, y - 1, cw, 6);
-    g.fillRect(x - 4, y - 13, 8, ch + 13);
-    g.fillCircle(x, y + 6, 6);
-    g.fillStyle(0x5a2a00); g.fillCircle(x, y + 7, 3.5);
+    g.fillStyle(0x7A3A0A); g.fillRoundedRect(x - 19, y + 1, 38, 22, 4);
+    g.fillStyle(0x9A4A10); g.fillRoundedRect(x - 19, y - 13, 38, 17, 4);
+    g.fillStyle(color);    g.fillRect(x - 19, y - 1, 38, 7);
+    g.fillRect(x - 5, y - 13, 10, 36);
+    g.fillCircle(x, y + 8, 6.5);
+    g.fillStyle(0x5A2A00); g.fillCircle(x, y + 9, 4);
+    g.fillStyle(0xFFEE88, 0.35); g.fillCircle(x - 2, y + 6, 2);
   }
 
   // ── BATTLE BAR ────────────────────────────────────────────────────────────
@@ -506,202 +456,190 @@ export class MainMenuScene extends Phaser.Scene {
     const { W, H } = this;
     const BY = H * 0.838;
 
-    // ─ DECK button (left) ─────────────────────────────────────────────────
-    const DX = W / 2 - 126;
-    const dg = this.add.graphics().setDepth(3);
-    dg.fillStyle(0x2266BB);
-    dg.fillRoundedRect(DX - 28, BY - 28, 56, 56, 10);
-    dg.fillStyle(0x1A4A99);
-    dg.fillRoundedRect(DX - 28, BY + 4, 56, 24, 10);
-    dg.lineStyle(2, 0x55AAFF, 0.5);
-    dg.strokeRoundedRect(DX - 28, BY - 28, 56, 56, 10);
-
-    // Card stack icon
-    dg.fillStyle(0x1a3355); dg.fillRoundedRect(DX - 12, BY - 18, 24, 32, 4);
-    dg.fillStyle(0xCCCCCC); dg.fillRoundedRect(DX - 16, BY - 22, 24, 32, 4);
-    dg.fillStyle(0xEEEEEE); dg.fillRoundedRect(DX - 14, BY - 20, 24, 32, 4);
-    dg.lineStyle(1, 0xCCCCCC, 0.4); dg.strokeRoundedRect(DX - 14, BY - 20, 24, 32, 4);
-    // Knight on card
-    dg.fillStyle(0x3366BB); dg.fillCircle(DX - 2, BY - 10, 7);
-    dg.fillStyle(0xBBBBBB); dg.fillRect(DX - 8, BY, 12, 8);
-    this.add.text(DX, BY + 16, '◄ ►', {
-      fontSize: '10px', fill: '#AAAAAA', fontFamily: 'Arial'
-    }).setOrigin(0.5).setDepth(4);
-
-    this.add.zone(DX, BY, 56, 56).setInteractive({ useHandCursor: true }).setDepth(5)
-      .on('pointerdown', () => { audioSystem.playClick(); this.scene.start('CharSelect', { mode: 'deck_edit' }); });
+    // ─ Deck button (left) ─────────────────────────────────────────────────
+    const DX = W / 2 - 128;
+    const dG = this.add.graphics().setDepth(3);
+    dG.fillStyle(0x1A5599); dG.fillRoundedRect(DX - 30, BY - 30, 60, 60, 11);
+    dG.fillStyle(0x124488); dG.fillRoundedRect(DX - 30, BY + 6,  60, 24, 11);
+    dG.lineStyle(2, 0x55AAFF, 0.55); dG.strokeRoundedRect(DX - 30, BY - 30, 60, 60, 11);
+    dG.fillStyle(0xFFEEEE, 0.9); dG.fillRoundedRect(DX - 14, BY - 20, 26, 34, 5);
+    dG.fillStyle(0x3366BB); dG.fillCircle(DX - 1, BY - 8, 8);
+    dG.fillStyle(0xBBBBBB); dG.fillRect(DX - 7, BY + 2, 12, 8);
+    dG.lineStyle(1, 0xCCCCCC, 0.4); dG.strokeRoundedRect(DX - 14, BY - 20, 26, 34, 5);
+    this.add.text(DX, BY + 22, '◄ ►', { fontSize: '10px', fill: '#AAAAAA', fontFamily: 'Arial' }).setOrigin(0.5).setDepth(4);
+    this.add.zone(DX, BY, 60, 60).setInteractive({ useHandCursor: true }).setDepth(5)
+      .on('pointerdown', () => { audioSystem.playClick(); this.cameras.main.fadeOut(260, 0,0,0); this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('CharSelect', { mode: 'deck_edit' })); });
 
     // ─ BATTLE button (center) ─────────────────────────────────────────────
-    const BW = 180, BH = 60;
-    const battleG = this.add.graphics().setDepth(3);
+    const BW = 188, BH = 62;
+    const btG = this.add.graphics().setDepth(3);
 
-    // Outer glow pulse
-    battleG.fillStyle(0xFFAA00, 0.22);
-    battleG.fillRoundedRect(W / 2 - BW / 2 - 6, BY - BH / 2 - 6, BW + 12, BH + 12, 16);
-
+    // Outer glow aura
+    btG.fillStyle(0xFFAA00, 0.18); btG.fillRoundedRect(W/2 - BW/2 - 8, BY - BH/2 - 8, BW + 16, BH + 16, 18);
+    // Shadow
+    btG.fillStyle(0x000000, 0.35); btG.fillRoundedRect(W/2 - BW/2 + 3, BY - BH/2 + 5, BW, BH, 13);
     // Button body
-    battleG.fillStyle(0xFFCC00);
-    battleG.fillRoundedRect(W / 2 - BW / 2, BY - BH / 2, BW, BH, 12);
-    // Top highlight
-    battleG.fillStyle(0xFFEE44);
-    battleG.fillRoundedRect(W / 2 - BW / 2, BY - BH / 2, BW, BH * 0.5, 12);
-    // Bottom shadow
-    battleG.fillStyle(0xBB8800);
-    battleG.fillRoundedRect(W / 2 - BW / 2, BY + BH * 0.16, BW, BH * 0.34, 12);
-    battleG.lineStyle(2, 0xFF9900, 0.7);
-    battleG.strokeRoundedRect(W / 2 - BW / 2, BY - BH / 2, BW, BH, 12);
+    btG.fillStyle(0xEEAA00); btG.fillRoundedRect(W/2 - BW/2, BY - BH/2, BW, BH, 13);
+    // Top highlight (2-tone for 3D feel)
+    btG.fillStyle(0xFFDD44); btG.fillRoundedRect(W/2 - BW/2, BY - BH/2, BW, BH * 0.48, 13);
+    // Bottom shade
+    btG.fillStyle(0xAA7700); btG.fillRoundedRect(W/2 - BW/2, BY + BH * 0.20, BW, BH * 0.30, 13);
+    // Sheen stripe
+    btG.fillStyle(0xFFFFAA, 0.20); btG.fillRoundedRect(W/2 - BW/2 + 14, BY - BH/2 + 6, 60, 14, 8);
+    // Border
+    btG.lineStyle(2.5, 0xFF9900, 0.8); btG.strokeRoundedRect(W/2 - BW/2, BY - BH/2, BW, BH, 13);
 
-    this.add.text(W / 2, BY, 'BATTLE', {
-      fontSize: '32px', fill: '#5A2800',
-      fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+    this.add.text(W/2, BY + 1, 'BATTLE', {
+      fontSize: '34px', fill: '#2A1200',
+      fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+      stroke: '#000000', strokeThickness: 1
     }).setOrigin(0.5).setDepth(4);
 
     // Pulsing glow tween
-    this.tweens.add({ targets: battleG, alpha: 0.88, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    this.tweens.add({ targets: btG, alpha: 0.85, duration: 960, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
-    this.add.zone(W / 2, BY, BW, BH).setInteractive({ useHandCursor: true }).setDepth(5)
+    this.add.zone(W/2, BY, BW, BH).setInteractive({ useHandCursor: true }).setDepth(5)
       .on('pointerdown', () => {
         audioSystem.playClick();
-        this.cameras.main.fadeOut(260, 0, 0, 0);
+        this.cameras.main.fadeOut(260, 0,0,0);
         this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('CharSelect', { mode: '1v1' }));
       });
 
-    // ─ Rank button (right) ─────────────────────────────────────────────────
-    const RX = W / 2 + 126;
-    const rg = this.add.graphics().setDepth(3);
-    rg.fillStyle(0xFFCC00);
-    rg.fillRoundedRect(RX - 28, BY - 28, 56, 56, 10);
-    rg.fillStyle(0xBB8800);
-    rg.fillRoundedRect(RX - 28, BY + 4, 56, 24, 10);
-    rg.lineStyle(2, 0xFFEE44, 0.5);
-    rg.strokeRoundedRect(RX - 28, BY - 28, 56, 56, 10);
+    // ─ 2v2 button (right) ─────────────────────────────────────────────────
+    const RX = W/2 + 128;
+    const rG = this.add.graphics().setDepth(3);
+    rG.fillStyle(0xCC9900); rG.fillRoundedRect(RX - 30, BY - 30, 60, 60, 11);
+    rG.fillStyle(0xFFDD00); rG.fillRoundedRect(RX - 30, BY - 30, 60, 44, 11);
+    rG.fillStyle(0xFFEE88, 0.3); rG.fillRoundedRect(RX - 26, BY - 27, 24, 14, 6);
+    rG.lineStyle(2, 0xFFEE44, 0.5); rG.strokeRoundedRect(RX - 30, BY - 30, 60, 60, 11);
+    rG.fillStyle(0x1A3A8A);
+    rG.fillTriangle(RX, BY - 24, RX + 17, BY - 24, RX, BY + 8);
+    rG.fillRect(RX - 17, BY - 24, 18, 32);
+    rG.fillStyle(0xFFD700); rG.fillCircle(RX, BY - 5, 9);
+    rG.fillStyle(0xFF2200); rG.fillCircle(RX, BY - 5, 5);
+    rG.fillStyle(0xFF8888, 0.4); rG.fillCircle(RX - 2, BY - 7, 2.5);
+    this.add.text(RX, BY + 22, '2v2', { fontSize: '10px', fill: '#2A1400', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(0.5).setDepth(4);
+    this.add.zone(RX, BY, 60, 60).setInteractive({ useHandCursor: true }).setDepth(5)
+      .on('pointerdown', () => { audioSystem.playClick(); this.cameras.main.fadeOut(260, 0,0,0); this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('CharSelect', { mode: '2v2' })); });
 
-    // Shield icon
-    rg.fillStyle(0x1A3A8A);
-    rg.fillTriangle(RX, BY - 22, RX + 16, BY - 22, RX, BY + 6);
-    rg.fillRect(RX - 16, BY - 22, 17, 28);
-    rg.fillStyle(0xFFD700);
-    rg.fillCircle(RX, BY - 4, 8);
-    rg.fillStyle(0xFF2200);
-    rg.fillCircle(RX, BY - 4, 4);
-
-    this.add.text(RX, BY + 20, '2v2', {
-      fontSize: '10px', fill: '#331100', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setOrigin(0.5).setDepth(4);
-
-    this.add.zone(RX, BY, 56, 56).setInteractive({ useHandCursor: true }).setDepth(5)
-      .on('pointerdown', () => { audioSystem.playClick(); this.scene.start('CharSelect', { mode: '2v2' }); });
-
-    // ─ VS CPU button (below main battle button) ────────────────────────────
-    const cpuY = BY + 42;
+    // ─ VS CPU button ──────────────────────────────────────────────────────
+    const cpuY = BY + 44;
     const cpuG = this.add.graphics().setDepth(3);
-    cpuG.fillStyle(0x0a1a22, 0.95);
-    cpuG.fillRoundedRect(W / 2 - 100, cpuY - 18, 200, 36, 10);
-    cpuG.lineStyle(1.5, 0x00CCFF, 0.5);
-    cpuG.strokeRoundedRect(W / 2 - 100, cpuY - 18, 200, 36, 10);
+    // Gradient bg
+    cpuG.fillStyle(0x061422, 0.96); cpuG.fillRoundedRect(W/2 - 108, cpuY - 20, 216, 40, 12);
+    cpuG.lineStyle(2, 0x0088CC, 0.65); cpuG.strokeRoundedRect(W/2 - 108, cpuY - 20, 216, 40, 12);
+    // Inner glow
+    cpuG.lineStyle(5, 0x00AAFF, 0.10); cpuG.strokeRoundedRect(W/2 - 106, cpuY - 18, 212, 36, 11);
+    // Left lightning bolt
+    cpuG.fillStyle(0x00CCFF, 0.9);
+    cpuG.fillTriangle(W/2 - 90, cpuY - 9, W/2 - 82, cpuY - 9, W/2 - 88, cpuY + 2);
+    cpuG.fillTriangle(W/2 - 88, cpuY - 2, W/2 - 80, cpuY - 2, W/2 - 86, cpuY + 9);
 
-    const cpuLabel = this.add.text(W / 2, cpuY, '⚡  VS CPU  —  Practice Mode', {
-      fontSize: '13px', fill: '#00DDFF',
-      fontFamily: 'Arial', fontStyle: 'bold'
+    const cpuLabel = this.add.text(W/2 + 4, cpuY, 'VS CPU  —  Practice Mode', {
+      fontSize: '13px', fill: '#00DDFF', fontFamily: 'Arial', fontStyle: 'bold'
     }).setOrigin(0.5).setDepth(4);
 
-    this.add.zone(W / 2, cpuY, 200, 36).setInteractive({ useHandCursor: true }).setDepth(5)
-      .on('pointerover', () => { cpuG.setAlpha(1.2); cpuLabel.setStyle({ fill: '#88EEFF' }); })
-      .on('pointerout',  () => { cpuG.setAlpha(1);   cpuLabel.setStyle({ fill: '#00DDFF' }); })
+    this.add.zone(W/2, cpuY, 216, 40).setInteractive({ useHandCursor: true }).setDepth(5)
+      .on('pointerover', () => cpuLabel.setStyle({ fill: '#AAEEFF' }))
+      .on('pointerout',  () => cpuLabel.setStyle({ fill: '#00DDFF' }))
       .on('pointerdown', () => {
         audioSystem.playClick();
-        this.cameras.main.fadeOut(260, 0, 0, 0);
-        this.cameras.main.once('camerafadeoutcomplete', () =>
-          this.scene.start('CharSelect', { mode: 'vs_cpu' })
-        );
+        this.cameras.main.fadeOut(260, 0,0,0);
+        this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('CharSelect', { mode: 'vs_cpu' }));
       });
   }
 
   // ── BOTTOM NAV BAR ────────────────────────────────────────────────────────
   _drawNavBar() {
     const { W, H } = this;
-    const NAV_H = 64;
+    const NAV_H = 66;
     const NY = H - NAV_H;
 
+    // Nav background with top border
     const navG = this.add.graphics().setDepth(6);
-    navG.fillStyle(0x081410, 0.97);
-    navG.fillRect(0, NY, W, NAV_H);
-    navG.lineStyle(1, 0x1a4a30, 0.8);
-    navG.lineBetween(0, NY, W, NY);
+    navG.fillStyle(0x050F0A, 0.97); navG.fillRect(0, NY, W, NAV_H);
+    navG.lineStyle(1.5, 0x0A4A30, 0.7); navG.lineBetween(0, NY, W, NY);
+    // Subtle inner glow at top
+    navG.lineStyle(3, 0x1A8855, 0.08); navG.lineBetween(0, NY + 1, W, NY + 1);
 
     const items = [
-      { icon: '📦', label: 'Chests',  x: W * 0.1,  active: false },
-      { icon: '🃏', label: 'Cards',   x: W * 0.3,  active: false },
-      { icon: '⚔',  label: 'Battle',  x: W * 0.5,  active: true  },
-      { icon: '👥', label: 'Social',  x: W * 0.7,  active: false },
-      { icon: '🏆', label: 'Trophy',  x: W * 0.9,  active: false },
+      { icon: '📦', label: 'Chests', x: W * 0.10, cb: () => {} },
+      { icon: '🃏', label: 'Cards',  x: W * 0.30, cb: () => { this.cameras.main.fadeOut(260,0,0,0); this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('CharSelect', { mode: 'deck_edit' })); } },
+      { icon: '⚔',  label: 'Battle', x: W * 0.50, active: true, cb: () => {} },
+      { icon: '👥', label: 'Social', x: W * 0.70, cb: () => this._showInvite() },
+      { icon: '🏆', label: 'Trophy', x: W * 0.90, cb: () => {} },
     ];
 
-    const callbacks = [
-      () => {},
-      () => this.scene.start('CharSelect', { mode: 'deck_edit' }),
-      () => {},
-      () => this._showInvite(),
-      () => {},
-    ];
-
-    for (let i = 0; i < items.length; i++) {
-      const it = items[i];
+    for (const it of items) {
       const cy = NY + NAV_H / 2 - 2;
-
       if (it.active) {
-        // Yellow indicator bar
         const indG = this.add.graphics().setDepth(7);
-        indG.fillStyle(0xFFD700);
-        indG.fillRect(it.x - 28, NY, 56, 3);
+        indG.fillStyle(0xFFD700); indG.fillRect(it.x - 30, NY, 60, 3);
       }
-
-      const alpha = it.active ? '#FFFFFF' : '#445544';
-      const sz = it.active ? '24px' : '21px';
-
-      this.add.text(it.x, cy - 9, it.icon, {
-        fontSize: sz, fill: '#FFFFFF', fontFamily: 'Arial'
-      }).setOrigin(0.5).setAlpha(it.active ? 1 : 0.45).setDepth(7);
-
+      this.add.text(it.x, cy - 10, it.icon, {
+        fontSize: it.active ? '25px' : '22px', fill: '#FFFFFF', fontFamily: 'Arial'
+      }).setOrigin(0.5).setAlpha(it.active ? 1 : 0.42).setDepth(7);
       this.add.text(it.x, cy + 14, it.label, {
-        fontSize: '9px', fill: alpha, fontFamily: 'Arial', fontStyle: it.active ? 'bold' : 'normal'
+        fontSize: '9px', fill: it.active ? '#FFFFFF' : '#446644',
+        fontFamily: 'Arial', fontStyle: it.active ? 'bold' : 'normal'
       }).setOrigin(0.5).setDepth(7);
+      this.add.zone(it.x, cy, 76, NAV_H).setInteractive({ useHandCursor: true }).setDepth(8)
+        .on('pointerdown', () => { audioSystem.playClick(); it.cb(); });
+    }
+  }
 
-      this.add.zone(it.x, cy, 72, NAV_H)
-        .setInteractive({ useHandCursor: true }).setDepth(8)
-        .on('pointerdown', () => { audioSystem.playClick(); callbacks[i](); });
+  // ── AMBIENT PARTICLES (floating upward sparkles) ──────────────────────────
+  _startAmbientParticles() {
+    const { W, H } = this;
+    this._sparks = [];
+    this._sparkG = this.add.graphics().setDepth(5);
+    this.time.addEvent({
+      delay: 220, loop: true,
+      callback: () => {
+        if (this._sparks.length < 22) {
+          this._sparks.push({
+            x: W * 0.12 + Math.random() * W * 0.76,
+            y: H * 0.65 + Math.random() * H * 0.12,
+            vx: (Math.random() - 0.5) * 0.4,
+            vy: -(0.4 + Math.random() * 0.5),
+            life: 1,
+            size: 1.5 + Math.random() * 2,
+            col: [0xFFD700, 0xFFCC44, 0x88FFCC, 0xFFFFAA][Math.floor(Math.random() * 4)]
+          });
+        }
+      }
+    });
+  }
+
+  update() {
+    if (!this._sparks) return;
+    this._sparkG.clear();
+    this._sparks = this._sparks.filter(p => p.life > 0);
+    for (const p of this._sparks) {
+      p.x += p.vx; p.y += p.vy; p.life -= 0.012;
+      if (p.life > 0) {
+        this._sparkG.fillStyle(p.col, Math.min(1, p.life * 1.5));
+        this._sparkG.fillRect(p.x, p.y, p.size, p.size);
+      }
     }
   }
 
   // ── INVITE OVERLAY ────────────────────────────────────────────────────────
   _buildInviteContainer() {
     const { W, H } = this;
-    this._inviteContainer = this.add.container(W / 2, H / 2 - 40)
-      .setVisible(false).setDepth(20);
-
-    const panel = this.add.rectangle(0, 0, 320, 200, 0x0a0820, 0.97)
-      .setStrokeStyle(2, 0xFFD700);
-    const title = this.add.text(0, -70, '📨  Invite a Friend', {
-      fontSize: '18px', fill: '#FFD700', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setOrigin(0.5);
-    const hint = this.add.text(0, -30, 'Type username in the field below', {
-      fontSize: '12px', fill: '#AAAACC', fontFamily: 'Arial'
-    }).setOrigin(0.5);
-
-    const sendBtn = this.add.text(0, 40, '[ SEND INVITE ]', {
-      fontSize: '15px', fill: '#27AE60', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    sendBtn.on('pointerdown', () => {
-      const v = document.getElementById('bb-invite-input')?.value?.trim();
-      if (v) { socketManager.inviteFriend(v, this.registry.get('deck') || []); this._hideInvite(); }
-    });
-
-    const closeBtn = this.add.text(0, 76, '[ CANCEL ]', {
-      fontSize: '13px', fill: '#666688', fontFamily: 'Arial'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this._hideInvite());
-
-    this._inviteContainer.add([panel, title, hint, sendBtn, closeBtn]);
+    this._inviteContainer = this.add.container(W / 2, H / 2 - 40).setVisible(false).setDepth(20);
+    const panel = this.add.rectangle(0, 0, 320, 200, 0x0A0820, 0.97).setStrokeStyle(2, 0xFFD700);
+    const title = this.add.text(0, -70, '📨  Invite a Friend', { fontSize: '18px', fill: '#FFD700', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(0.5);
+    const hint  = this.add.text(0, -30, 'Enter their username below', { fontSize: '12px', fill: '#AAAACC', fontFamily: 'Arial' }).setOrigin(0.5);
+    const send  = this.add.text(0, 40, '[ SEND INVITE ]', { fontSize: '15px', fill: '#27AE60', fontFamily: 'Arial', fontStyle: 'bold' })
+      .setOrigin(0.5).setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        const v = document.getElementById('bb-invite-input')?.value?.trim();
+        if (v) { socketManager.inviteFriend(v, this.registry.get('deck') || []); this._hideInvite(); }
+      });
+    const close = this.add.text(0, 76, '[ CANCEL ]', { fontSize: '13px', fill: '#666688', fontFamily: 'Arial' })
+      .setOrigin(0.5).setInteractive({ useHandCursor: true }).on('pointerdown', () => this._hideInvite());
+    this._inviteContainer.add([panel, title, hint, send, close]);
   }
 
   _showInvite() {
@@ -727,40 +665,29 @@ export class MainMenuScene extends Phaser.Scene {
   _onFriendInvite({ from, fromId }) {
     const { W, H } = this;
     const c = this.add.container(W / 2, H * 0.28).setDepth(30);
-    c.add(this.add.rectangle(0, 0, 320, 140, 0x0a0820, 0.97).setStrokeStyle(2, 0xFFD700));
-    c.add(this.add.text(0, -42, `${from} invited you to battle!`, {
-      fontSize: '15px', fill: '#FFD700', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setOrigin(0.5));
-    const accept = this.add.text(-66, 18, '[ ACCEPT ]', {
-      fontSize: '15px', fill: '#27AE60', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    accept.on('pointerdown', () => {
-      socketManager.acceptInvite(fromId); c.destroy();
-      this.cameras.main.fadeOut(280, 0, 0, 0);
-      this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('CharSelect', { mode: '1v1' }));
-    });
-    const dec = this.add.text(66, 18, '[ DECLINE ]', {
-      fontSize: '15px', fill: '#C0392B', fontFamily: 'Arial', fontStyle: 'bold'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    dec.on('pointerdown', () => { socketManager.declineInvite(fromId); c.destroy(); });
+    c.add(this.add.rectangle(0, 0, 320, 140, 0x0A0820, 0.97).setStrokeStyle(2, 0xFFD700));
+    c.add(this.add.text(0, -42, `${from} wants to battle!`, { fontSize: '15px', fill: '#FFD700', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(0.5));
+    const accept = this.add.text(-66, 18, '[ ACCEPT ]', { fontSize: '15px', fill: '#27AE60', fontFamily: 'Arial', fontStyle: 'bold' })
+      .setOrigin(0.5).setInteractive({ useHandCursor: true })
+      .on('pointerdown', () => {
+        socketManager.acceptInvite(fromId); c.destroy();
+        this.cameras.main.fadeOut(280, 0,0,0);
+        this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('CharSelect', { mode: '1v1' }));
+      });
+    const dec = this.add.text(66, 18, '[ DECLINE ]', { fontSize: '15px', fill: '#C0392B', fontFamily: 'Arial', fontStyle: 'bold' })
+      .setOrigin(0.5).setInteractive({ useHandCursor: true }).on('pointerdown', () => { socketManager.declineInvite(fromId); c.destroy(); });
     c.add([accept, dec]);
     this.time.delayedCall(15000, () => { if (c.active) c.destroy(); });
   }
 
   _logout() {
-    localStorage.removeItem('bb_token'); localStorage.removeItem('bb_username');
-    localStorage.removeItem('bb_gold');
+    localStorage.removeItem('bb_token'); localStorage.removeItem('bb_username'); localStorage.removeItem('bb_gold');
     socketManager.disconnect();
-    this.cameras.main.fadeOut(280, 0, 0, 0);
+    this.cameras.main.fadeOut(280, 0,0,0);
     this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('Auth'));
   }
 
-  _fmt(n) {
-    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
-  }
+  _fmt(n) { return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' '); }
 
-  shutdown() {
-    socketManager.offAll('friend_invite');
-    this._hideInvite();
-  }
+  shutdown() { socketManager.offAll('friend_invite'); this._hideInvite(); }
 }

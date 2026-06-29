@@ -400,14 +400,16 @@ export class BattleScene extends Phaser.Scene {
   }
 
   _buildDeployIndicator(x, y) {
-    // Flash a small ring where the unit was deployed
+    // Outer shockwave
     const ring = this.add.graphics().setDepth(7);
-    ring.lineStyle(3, 0xFFFFFF, 0.8);
-    ring.strokeCircle(x, y, 20);
-    this.tweens.add({
-      targets: ring, alpha: 0, scaleX: 2, scaleY: 2,
-      duration: 400, onComplete: () => ring.destroy()
-    });
+    ring.lineStyle(2, 0x00FFAA, 1);
+    ring.strokeCircle(x, y, 18);
+    this.tweens.add({ targets: ring, scaleX: 3, scaleY: 3, alpha: 0, duration: 450, ease: 'Power2', onComplete: () => ring.destroy() });
+    // Inner flash
+    const flash = this.add.graphics().setDepth(7);
+    flash.fillStyle(0x00FFAA, 0.55);
+    flash.fillCircle(x, y, 16);
+    this.tweens.add({ targets: flash, alpha: 0, scaleX: 0.5, scaleY: 0.5, duration: 280, onComplete: () => flash.destroy() });
   }
 
   // ── Drag-to-deploy ─────────────────────────────────────────────────────────
@@ -577,17 +579,21 @@ export class BattleScene extends Phaser.Scene {
     // Update or create units
     for (const u of serverUnits) {
       if (this.unitGraphics[u.id]) {
-        // Update position and HP
         const uObj = this.unitGraphics[u.id];
-        uObj.g.x = u.x; uObj.g.y = u.y;
-        uObj.tintG.setPosition(u.x, u.y);
-        uObj.hpBg.setPosition(u.x, u.y + 28);
-        uObj.hpBar.setPosition(u.x, u.y + 28);
-        uObj.x = u.x; uObj.y = u.y;
+        const { height: H } = this.scale;
+        const depthSc = this._unitDepthScale(u.y);
+        const barW    = 36 * depthSc;
 
-        const pct = Math.max(0, u.hp / u.maxHp);
-        uObj.hpBar.setDisplaySize(30 * pct, 4);
+        uObj.g.setPosition(u.x, u.y).setScale(1.0 * depthSc);
+        uObj.tintG.setPosition(u.x, u.y);
+        uObj.tintG.clear();
+        uObj.tintG.lineStyle(3, u.owner === this.myKey ? 0x44AAFF : 0xFF4444, 1);
+        uObj.tintG.strokeCircle(0, 24, 18 * depthSc);
+
+        uObj.hpBg.setPosition(u.x, u.y - 32 * depthSc).setDisplaySize(barW + 4, 6);
+        uObj.hpBar.setPosition(u.x, u.y - 32 * depthSc).setDisplaySize(barW * Math.max(0, u.hp / u.maxHp), 4);
         uObj.hpBar.setFillStyle(u.owner === this.myKey ? 0x27AE60 : 0xE74C3C);
+        uObj.x = u.x; uObj.y = u.y;
       } else {
         // Create new unit
         this._createUnitGraphic(u);
@@ -595,7 +601,17 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
+  _unitDepthScale(y) {
+    // Units at the top (y≈100) appear at 72% size; at bottom (y≈750) at 100% — creates depth illusion
+    const { height: H } = this.scale;
+    return 0.72 + (y / H) * 0.28;
+  }
+
   _createUnitGraphic(u) {
+    const { height: H } = this.scale;
+    const depthSc = this._unitDepthScale(u.y);
+    const BASE_SCALE = 1.0;
+
     const g = this.add.graphics().setDepth(5);
     g.x = u.x; g.y = u.y;
 
@@ -603,32 +619,43 @@ export class BattleScene extends Phaser.Scene {
     if (drawFn) drawFn(g);
     else {
       g.fillStyle(0x888888);
-      g.fillCircle(0, 0, 16);
+      g.fillCircle(0, 0, 18);
     }
-    g.setScale(0.6);
+    g.setScale(BASE_SCALE * depthSc);
 
-    // Team tint overlay
-    const tintG = this.add.graphics().setDepth(5).setAlpha(0.18);
+    // Team color ring (clean, not a heavy tint blob)
+    const isMe = u.owner === this.myKey;
+    const tintG = this.add.graphics().setDepth(4).setAlpha(0.70);
     tintG.x = u.x; tintG.y = u.y;
-    tintG.fillStyle(u.owner === this.myKey ? 0x0000FF : 0xFF0000);
-    tintG.fillCircle(0, 0, 18);
+    tintG.lineStyle(3, isMe ? 0x44AAFF : 0xFF4444, 1);
+    tintG.strokeCircle(0, 24, 18 * depthSc);
 
-    // HP bar
-    const hpBg = this.add.rectangle(u.x, u.y + 28, 32, 5, 0x111111).setDepth(6);
-    const hpBar = this.add.rectangle(u.x, u.y + 28, 30, 4, 0x27AE60).setDepth(7).setOrigin(0.5);
+    // HP bar (above unit, not below — looks more modern)
+    const barW = 36 * depthSc;
+    const hpBg  = this.add.rectangle(u.x, u.y - 32 * depthSc, barW + 4, 6, 0x111111).setDepth(6);
+    const hpBar = this.add.rectangle(u.x, u.y - 32 * depthSc, barW,     4, isMe ? 0x27AE60 : 0xE74C3C).setDepth(7).setOrigin(0.5);
 
     this.unitGraphics[u.id] = { g, tintG, hpBg, hpBar, x: u.x, y: u.y };
   }
 
   _playDeathFX(x, y) {
-    const g = this.add.graphics().setDepth(15);
+    // Modern shockwave ring
+    const ring = this.add.graphics().setDepth(15);
+    ring.lineStyle(3, 0xFFFFFF, 0.9);
+    ring.strokeCircle(x, y, 14);
+    this.tweens.add({ targets: ring, scaleX: 3.5, scaleY: 3.5, alpha: 0, duration: 380, ease: 'Power2', onComplete: () => ring.destroy() });
+
+    // 6 directional sparks (thin lines, not blobs)
+    const sparks = this.add.graphics().setDepth(14);
     for (let i = 0; i < 6; i++) {
-      const angle = Math.random() * Math.PI * 2;
-      const r = 10 + Math.random() * 15;
-      g.fillStyle(0xFFAA00, 0.7);
-      g.fillCircle(x + Math.cos(angle) * r, y + Math.sin(angle) * r, 3 + Math.random() * 3);
+      const angle = (i / 6) * Math.PI * 2;
+      const len = 16 + Math.random() * 14;
+      const col = i % 2 === 0 ? 0xFFCC00 : 0xFF8800;
+      sparks.lineStyle(2, col, 0.9);
+      sparks.lineBetween(x, y, x + Math.cos(angle) * len, y + Math.sin(angle) * len);
     }
-    this.tweens.add({ targets: g, alpha: 0, duration: 350, onComplete: () => g.destroy() });
+    this.tweens.add({ targets: sparks, scaleX: 1.8, scaleY: 1.8, alpha: 0, duration: 280, onComplete: () => sparks.destroy() });
+
     audioSystem.playHit();
   }
 
@@ -647,14 +674,24 @@ export class BattleScene extends Phaser.Scene {
 
   _showDamageNumber(x, y, dmg) {
     if (!dmg) return;
-    const txt = this.add.text(x, y - 20, `-${dmg}`, {
-      fontSize: '13px', fill: '#FF6B6B',
-      fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#1a1a1a', strokeThickness: 3
-    }).setOrigin(0.5).setDepth(18);
+    const isCrit = dmg > 200;
+    const txt = this.add.text(x, y - 28, `-${dmg}`, {
+      fontSize:        isCrit ? '22px' : '15px',
+      fill:            isCrit ? '#FF2222' : '#FFFFFF',
+      fontFamily:      'Arial Black, Arial',
+      fontStyle:       'bold',
+      stroke:          '#000000',
+      strokeThickness: isCrit ? 5 : 3,
+    }).setOrigin(0.5).setDepth(18).setScale(isCrit ? 0.8 : 1);
 
     this.tweens.add({
-      targets: txt, y: txt.y - 40, alpha: 0, duration: 900,
+      targets: txt,
+      y:       txt.y - 55,
+      alpha:   0,
+      scaleX:  isCrit ? 1.4 : 1.1,
+      scaleY:  isCrit ? 1.4 : 1.1,
+      duration: isCrit ? 1100 : 850,
+      ease:    'Power2',
       onComplete: () => txt.destroy()
     });
   }
