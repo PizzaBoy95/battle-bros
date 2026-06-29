@@ -158,15 +158,16 @@ export class CharSelectScene extends Phaser.Scene {
     this._drawCardBorder(border, cx, cy, CW, CH, rc, isSel);
 
     // ── Character portrait ──────────────────────────────────────────────────
+    // Use canvas-generated portrait texture (always available, crisp at any size)
+    const portraitKey = charId + '_p';
     let portrait;
-    if (this.textures.exists(charId)) {
-      portrait = this.add.image(cx, cy - 12, charId)
-        .setDisplaySize(CW - 8, CH * 0.58)
+    if (this.textures.exists(portraitKey)) {
+      portrait = this.add.image(cx, cy - 12, portraitKey)
+        .setDisplaySize(CW - 4, CH * 0.60)
         .setDepth(1);
     } else {
       portrait = this.add.graphics().setDepth(1);
-      portrait.x = cx;
-      portrait.y = cy - 10;
+      portrait.x = cx; portrait.y = cy - 10;
       const fn = DRAW_FUNCS[charId];
       if (fn) fn(portrait);
       portrait.setScale(0.62);
@@ -333,8 +334,9 @@ export class CharSelectScene extends Phaser.Scene {
         bg.fillStyle(rc, 0.08);
         bg.fillRect(sx - SLOT_W / 2, sy - SLOT_H / 2, SLOT_W, SLOT_H);
 
-        if (this.textures.exists(charId)) {
-          const img = this.add.image(sx, sy - 4, charId).setDisplaySize(SLOT_W - 6, SLOT_H - 10).setDepth(11);
+        const pKey = charId + '_p';
+        if (this.textures.exists(pKey)) {
+          const img = this.add.image(sx, sy - 4, pKey).setDisplaySize(SLOT_W - 4, SLOT_H - 8).setDepth(11);
           objs.push(img);
         } else {
           const mg = this.add.graphics().setDepth(11);

@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { generateAllTextures } from '../characters/CharacterGraphics.js';
+import { generateAllTextures, generatePortraitTextures } from '../characters/CharacterGraphics.js';
 import { audioSystem } from '../systems/AudioSystem.js';
 
 export class BootScene extends Phaser.Scene {
@@ -32,7 +32,8 @@ export class BootScene extends Phaser.Scene {
     const loading = document.getElementById('loading');
     if (loading) loading.classList.add('hidden');
 
-    // Generate all character textures via Phaser Graphics API
+    // Generate canvas portrait textures (high-res, gradient art) + battle unit textures
+    generatePortraitTextures(this);
     generateAllTextures(this);
     this._genUITextures();
 
