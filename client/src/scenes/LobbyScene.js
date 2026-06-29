@@ -72,8 +72,14 @@ export class LobbyScene extends Phaser.Scene {
       this._onMatchStart(data);
     });
 
-    // Join queue
-    socketManager.joinQueue(this.deck, this.battleMode);
+    // Join queue (or start instant CPU game)
+    if (this.battleMode === 'vs_cpu') {
+      this.statusText.setText('Preparing CPU battle...');
+      this.modeLabel.setText('MODE: VS CPU  🤖');
+      socketManager.playVsCpu(this.deck);
+    } else {
+      socketManager.joinQueue(this.deck, this.battleMode);
+    }
 
     this.cameras.main.fadeIn(300);
   }

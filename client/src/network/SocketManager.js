@@ -60,6 +60,10 @@ class SocketManager {
     this.socket?.emit('join_queue', { deck, mode });
   }
 
+  playVsCpu(deck) {
+    this.socket?.emit('play_vs_cpu', { deck });
+  }
+
   leaveQueue() {
     this.socket?.emit('leave_queue', {});
   }

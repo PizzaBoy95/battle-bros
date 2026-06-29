@@ -53,6 +53,17 @@ function registerHandlers(io, gameManager) {
       if (fromSocket) fromSocket.emit('invite_declined', { by: socket.data.username });
     });
 
+    // ── VS CPU ─────────────────────────────────────────────────────────────────
+    socket.on('play_vs_cpu', (data) => {
+      const { deck } = data || {};
+      socket.data.deck = deck;
+      gameManager.createBotGame(socket, {
+        userId: socket.data.userId,
+        username: socket.data.username,
+        deck
+      });
+    });
+
     // ── Battle ─────────────────────────────────────────────────────────────────
     socket.on('deploy_unit', (data) => {
       gameManager.deployUnit(socket, data);

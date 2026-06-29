@@ -225,6 +225,25 @@ export class MainMenuScene extends Phaser.Scene {
     const cx = W / 2;
     const cy = H * 0.415;
 
+    // ─ Sky / atmosphere behind castle ─────────────────────────────────────
+    const sky = this.add.graphics().setDepth(0);
+    // Dark sky gradient (simulated with stacked rects at decreasing alpha)
+    for (let i = 0; i < 12; i++) {
+      const yy = H * 0.11 + i * 28;
+      sky.fillStyle(0x000818, 0.18 - i * 0.012);
+      sky.fillRect(0, yy, W, 30);
+    }
+    // Star field
+    for (let i = 0; i < 50; i++) {
+      const sx = Math.random() * W;
+      const sy = H * 0.11 + Math.random() * H * 0.28;
+      sky.fillStyle(0xFFFFFF, 0.06 + Math.random() * 0.22);
+      sky.fillRect(sx, sy, 1, 1);
+    }
+    // Horizon glow behind castle
+    sky.fillStyle(0x1A3A6A, 0.28); sky.fillEllipse(cx, cy + 30, 320, 120);
+    sky.fillStyle(0x2255AA, 0.12); sky.fillEllipse(cx, cy + 20, 260, 90);
+
     // ─ Ground shadow ──────────────────────────────────────────────────────
     const bg = this.add.graphics().setDepth(1);
     bg.fillStyle(0x000000, 0.3);
@@ -485,7 +504,7 @@ export class MainMenuScene extends Phaser.Scene {
   // ── BATTLE BAR ────────────────────────────────────────────────────────────
   _drawBattleBar() {
     const { W, H } = this;
-    const BY = H * 0.854;
+    const BY = H * 0.838;
 
     // ─ DECK button (left) ─────────────────────────────────────────────────
     const DX = W / 2 - 126;
@@ -572,6 +591,30 @@ export class MainMenuScene extends Phaser.Scene {
 
     this.add.zone(RX, BY, 56, 56).setInteractive({ useHandCursor: true }).setDepth(5)
       .on('pointerdown', () => { audioSystem.playClick(); this.scene.start('CharSelect', { mode: '2v2' }); });
+
+    // ─ VS CPU button (below main battle button) ────────────────────────────
+    const cpuY = BY + 42;
+    const cpuG = this.add.graphics().setDepth(3);
+    cpuG.fillStyle(0x0a1a22, 0.95);
+    cpuG.fillRoundedRect(W / 2 - 100, cpuY - 18, 200, 36, 10);
+    cpuG.lineStyle(1.5, 0x00CCFF, 0.5);
+    cpuG.strokeRoundedRect(W / 2 - 100, cpuY - 18, 200, 36, 10);
+
+    const cpuLabel = this.add.text(W / 2, cpuY, '⚡  VS CPU  —  Practice Mode', {
+      fontSize: '13px', fill: '#00DDFF',
+      fontFamily: 'Arial', fontStyle: 'bold'
+    }).setOrigin(0.5).setDepth(4);
+
+    this.add.zone(W / 2, cpuY, 200, 36).setInteractive({ useHandCursor: true }).setDepth(5)
+      .on('pointerover', () => { cpuG.setAlpha(1.2); cpuLabel.setStyle({ fill: '#88EEFF' }); })
+      .on('pointerout',  () => { cpuG.setAlpha(1);   cpuLabel.setStyle({ fill: '#00DDFF' }); })
+      .on('pointerdown', () => {
+        audioSystem.playClick();
+        this.cameras.main.fadeOut(260, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () =>
+          this.scene.start('CharSelect', { mode: 'vs_cpu' })
+        );
+      });
   }
 
   // ── BOTTOM NAV BAR ────────────────────────────────────────────────────────

@@ -4,218 +4,271 @@ import { audioSystem } from '../systems/AudioSystem.js';
 export class SplashScene extends Phaser.Scene {
   constructor() { super('Splash'); }
 
-  init(data) { this.autoLogin = data?.autoLogin || false; }
+  init(data) {
+    this.autoLogin = data?.autoLogin || false;
+    this._proceeded = false;
+    this._sparks = [];
+    this._rings = [];
+  }
 
   create() {
     const { width: W, height: H } = this.scale;
-    const cx = W / 2;
+    this.W = W; this.H = H;
 
-    // ── Base background ──────────────────────────────────────────────────────
+    // ── Pure black base ─────────────────────────────────────────────────────
     this.add.rectangle(0, 0, W, H, 0x000000).setOrigin(0);
 
-    // Deep purple radial glow from center
-    const bg = this.add.graphics();
-    [
-      [0x1a0535, 0.55, 420],
-      [0x110228, 0.45, 290],
-      [0x060112, 0.35, 160],
-    ].forEach(([c, a, r]) => { bg.fillStyle(c, a); bg.fillCircle(cx, H * 0.45, r); });
+    // ── Particle layer ──────────────────────────────────────────────────────
+    this._sparkG = this.add.graphics().setDepth(1);
+    this._glowG  = this.add.graphics().setDepth(2);
 
-    // Sunburst rays (very subtle)
-    const rays = this.add.graphics();
-    for (let i = 0; i < 16; i++) {
-      const ang = (i / 16) * Math.PI * 2;
-      rays.fillStyle(0xFFD700, 0.025);
-      rays.fillTriangle(
-        cx, H * 0.45,
-        cx + Math.cos(ang - 0.07) * 600, H * 0.45 + Math.sin(ang - 0.07) * 600,
-        cx + Math.cos(ang + 0.07) * 600, H * 0.45 + Math.sin(ang + 0.07) * 600
-      );
-    }
+    // ── Spawn sparks gradually ──────────────────────────────────────────────
+    this.time.addEvent({
+      delay: 30, repeat: 100,
+      callback: () => this._spawnSpark()
+    });
 
-    // Stars (small, sparse)
-    const sg = this.add.graphics();
-    for (let i = 0; i < 90; i++) {
-      sg.fillStyle(0xFFFFFF, 0.08 + Math.random() * 0.28);
-      sg.fillRect(Math.random() * W, Math.random() * H, 1 + (Math.random() > 0.85 ? 1 : 0), 1);
-    }
+    // ── Shield ──────────────────────────────────────────────────────────────
+    const SY = H * 0.305;
+    this._shieldG = this.add.graphics().setDepth(3);
+    this._drawShield(W / 2, SY);
+    this._shieldG.setAlpha(0).setScale(0.08);
 
-    // ── Shield emblem ────────────────────────────────────────────────────────
-    const SY = H * 0.295;
-    const shield = this._drawShield(cx, SY);
-    shield.setAlpha(0).setScale(0.1);
-
-    // ── BATTLE title ─────────────────────────────────────────────────────────
-    const TY = H * 0.52;
-
-    // Glow halos behind title
-    const bg1 = this.add.text(cx, TY, 'BATTLE', { fontSize: '76px', fill: '#FFB700', fontFamily: 'Arial Black, Arial', fontStyle: 'bold' }).setOrigin(0.5).setAlpha(0).setScale(1.12);
-    const battleText = this.add.text(cx, TY, 'BATTLE', {
-      fontSize: '76px', fill: '#FFE566',
+    // ── BATTLE text group ───────────────────────────────────────────────────
+    const TY = H * 0.555;
+    // Shadow pass
+    this._battleShadow = this.add.text(W / 2 + 4, TY + 5, 'BATTLE', {
+      fontSize: '82px', fill: '#1A0800', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+    }).setOrigin(0.5).setAlpha(0).setDepth(3);
+    // Main gold layer
+    this._battleText = this.add.text(W / 2, TY, 'BATTLE', {
+      fontSize: '82px', fill: '#FFD700',
       fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
-      stroke: '#3D1C00', strokeThickness: 8
-    }).setOrigin(0.5).setAlpha(0);
+      stroke: '#3D1C00', strokeThickness: 9
+    }).setOrigin(0.5).setAlpha(0).setDepth(4);
+    // Highlight pass
+    this._battleHL = this.add.text(W / 2, TY - 3, 'BATTLE', {
+      fontSize: '82px', fill: '#FFFFFF',
+      fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+    }).setOrigin(0.5).setAlpha(0).setDepth(5);
 
-    // ── BROS title ────────────────────────────────────────────────────────────
-    const bg2 = this.add.text(cx, TY + 88, 'BROS', { fontSize: '96px', fill: '#FF4400', fontFamily: 'Arial Black, Arial', fontStyle: 'bold' }).setOrigin(0.5).setAlpha(0).setScale(1.12);
-    const brosText = this.add.text(cx, TY + 88, 'BROS', {
-      fontSize: '96px', fill: '#FF6633',
+    // ── BROS text group ─────────────────────────────────────────────────────
+    const BY = TY + 94;
+    this._brosShadow = this.add.text(W / 2 + 4, BY + 5, 'BROS', {
+      fontSize: '100px', fill: '#0A0008', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+    }).setOrigin(0.5).setAlpha(0).setDepth(3);
+    this._brosText = this.add.text(W / 2, BY, 'BROS', {
+      fontSize: '100px', fill: '#FFFFFF',
       fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
-      stroke: '#1A0000', strokeThickness: 10
-    }).setOrigin(0.5).setAlpha(0);
+      stroke: '#200030', strokeThickness: 10
+    }).setOrigin(0.5).setAlpha(0).setDepth(4);
+    this._brosHL = this.add.text(W / 2, BY - 3, 'BROS', {
+      fontSize: '100px', fill: '#FFD700',
+      fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+    }).setOrigin(0.5).setAlpha(0).setDepth(5);
 
-    // Tagline
-    const tagline = this.add.text(cx, TY + 204, '✦  DEPLOY · BATTLE · CONQUER  ✦', {
-      fontSize: '11px', fill: '#BB8800', fontFamily: 'Arial', letterSpacing: 3
-    }).setOrigin(0.5).setAlpha(0);
+    // ── Tagline ─────────────────────────────────────────────────────────────
+    this._tagline = this.add.text(W / 2, BY + 116, '✦  DEPLOY · BATTLE · CONQUER  ✦', {
+      fontSize: '11px', fill: '#AA8800', fontFamily: 'Arial', letterSpacing: 4
+    }).setOrigin(0.5).setAlpha(0).setDepth(4);
 
-    // ── Spark particles ───────────────────────────────────────────────────────
-    const sparks = [];
-    for (let i = 0; i < 28; i++) {
-      const ang = Math.random() * Math.PI * 2;
-      const dist = 50 + Math.random() * 130;
-      const obj = this.add.rectangle(cx, SY, 2, 2, i % 3 === 0 ? 0xFF6600 : 0xFFD700).setAlpha(0);
-      sparks.push({ obj, targetX: cx + Math.cos(ang) * dist, targetY: SY + Math.sin(ang) * dist });
-    }
+    // ── TAP TO START ─────────────────────────────────────────────────────────
+    const PY = H * 0.87;
+    this._promptRingG = this.add.graphics().setDepth(3);
+    this._promptBg    = this.add.rectangle(W / 2, PY, 274, 54, 0xFFD700, 0).setDepth(3);
+    this._promptBord  = this.add.graphics().setDepth(4);
+    this._promptText  = this.add.text(W / 2, PY, '▶  TAP TO START  ◀', {
+      fontSize: '18px', fill: '#FFD700',
+      fontFamily: 'Arial Black, Arial',
+      stroke: '#5A3A00', strokeThickness: 4
+    }).setOrigin(0.5).setAlpha(0).setDepth(5);
 
-    // ── Tap prompt ────────────────────────────────────────────────────────────
-    const PY = H * 0.875;
-    const promptBg   = this.add.rectangle(cx, PY, 268, 50, 0xFFD700, 0.1).setAlpha(0);
-    const promptEdge = this.add.rectangle(cx, PY, 268, 50, 0x000000, 0).setStrokeStyle(1, 0xFFD700, 0.5).setAlpha(0);
-    const prompt     = this.add.text(cx, PY, '▶  TAP TO START  ◀', {
-      fontSize: '17px', fill: '#FFD700', fontFamily: 'Arial Black, Arial',
-      stroke: '#7A5500', strokeThickness: 3
-    }).setOrigin(0.5).setAlpha(0);
+    this._promptBord.lineStyle(1.5, 0xFFD700, 0);
+    this._promptBord.strokeRoundedRect(W / 2 - 137, PY - 27, 274, 54, 10);
 
-    // Version tag
-    this.add.text(cx, H - 16, 'v1.0 · BATTLE BROS', { fontSize: '10px', fill: '#333366', fontFamily: 'Arial' }).setOrigin(0.5);
+    this.add.text(W / 2, H - 14, 'v1.0 · BATTLE BROS', {
+      fontSize: '9px', fill: '#222244', fontFamily: 'Arial'
+    }).setOrigin(0.5).setDepth(3);
 
-    // ── Animation sequence ────────────────────────────────────────────────────
+    // ── Animation sequence ──────────────────────────────────────────────────
+    this._runSequence(W, H, SY);
 
-    // 1) Shield pops in (0.25s)
-    this.tweens.add({ targets: shield, alpha: 1, scaleX: 1, scaleY: 1, duration: 550, ease: 'Back.easeOut', delay: 200 });
-
-    // 2) Sparks burst (0.7s)
-    this.time.delayedCall(700, () => {
-      for (const { obj, targetX, targetY } of sparks) {
-        this.tweens.add({
-          targets: obj, alpha: 1, x: targetX, y: targetY,
-          duration: 500 + Math.random() * 300, ease: 'Power2',
-          onComplete: () => this.tweens.add({ targets: obj, alpha: 0, duration: 350 })
-        });
-      }
-    });
-
-    // 3) BATTLE slides from left (0.6s)
-    battleText.x = -120; bg1.x = -120;
-    this.time.delayedCall(550, () => {
-      this.tweens.add({ targets: [battleText, bg1], alpha: 1, x: cx, duration: 420, ease: 'Power3' });
-      bg1.setAlpha(0.22);
-    });
-
-    // 4) BROS slides from right (0.85s)
-    brosText.x = W + 120; bg2.x = W + 120;
-    this.time.delayedCall(800, () => {
-      this.tweens.add({ targets: [brosText, bg2], alpha: 1, x: cx, duration: 420, ease: 'Power3' });
-      bg2.setAlpha(0.22);
-    });
-
-    // 5) Tagline fades in
-    this.time.delayedCall(1100, () => {
-      this.tweens.add({ targets: tagline, alpha: 0.85, duration: 500 });
-    });
-
-    // 6) Prompt appears + pulses
-    this.time.delayedCall(1400, () => {
-      this.tweens.add({ targets: [promptBg, promptEdge, prompt], alpha: 1, duration: 450 });
-      this.tweens.add({ targets: prompt, alpha: 0.25, duration: 680, yoyo: true, repeat: -1, delay: 450 });
-      this.tweens.add({ targets: promptBg, alpha: 0.18, duration: 680, yoyo: true, repeat: -1, delay: 450 });
-    });
-
-    // 7) Idle title pulse
-    this.time.delayedCall(1600, () => {
-      this.tweens.add({ targets: [battleText, brosText], scaleX: 1.025, scaleY: 1.025, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-      this.tweens.add({ targets: shield, scaleX: 1.03, scaleY: 1.03, duration: 1800, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 200 });
-    });
-
-    // 8) Input
-    this.time.delayedCall(1500, () => {
-      this.input.once('pointerdown', () => this._proceed());
-      this.input.keyboard?.once('keydown', () => this._proceed());
-      this.time.delayedCall(6000, () => this._proceed());
-    });
-
-    // 9) Music
-    this.time.delayedCall(300, () => audioSystem.playTrack('battle_hymn'));
+    // ── Music ───────────────────────────────────────────────────────────────
+    this.time.delayedCall(200, () => audioSystem.playTrack('battle_hymn'));
   }
 
   _drawShield(cx, cy) {
-    const g = this.add.graphics();
+    const g = this._shieldG;
 
-    // Outer glow ring
-    g.fillStyle(0xFFD700, 0.08); g.fillCircle(cx, cy, 68);
-    g.fillStyle(0xFF6600, 0.06); g.fillCircle(cx, cy, 85);
-
-    // Shield shadow
-    g.fillStyle(0x000000, 0.35);
-    g.fillTriangle(cx - 35 + 4, cy - 32 + 4, cx + 35 + 4, cy - 32 + 4, cx + 4, cy + 46 + 4);
-    g.fillRect(cx - 35 + 4, cy - 56 + 4, 70, 26);
-
-    // Shield body (dark gold border)
-    g.fillStyle(0x7A5500);
-    g.fillTriangle(cx - 36, cy - 32, cx + 36, cy - 32, cx, cy + 46);
-    g.fillRect(cx - 36, cy - 56, 72, 26);
-
-    // Shield body (bright gold)
-    g.fillStyle(0xFFD700);
-    g.fillTriangle(cx - 30, cy - 27, cx + 30, cy - 27, cx, cy + 39);
-    g.fillRect(cx - 30, cy - 51, 60, 26);
-
-    // Inner plate (deep red/maroon)
-    g.fillStyle(0x6B0000);
-    g.fillTriangle(cx - 22, cy - 22, cx + 22, cy - 22, cx, cy + 30);
-    g.fillRect(cx - 22, cy - 46, 44, 26);
-
-    // Center gem (bright red diamond)
-    g.fillStyle(0xFF2200);
-    g.fillTriangle(cx, cy - 30, cx + 13, cy - 8, cx, cy + 14);
-    g.fillTriangle(cx - 13, cy - 8, cx, cy - 30, cx, cy + 14);
-    g.fillStyle(0xFF7755);
-    g.fillTriangle(cx, cy - 30, cx + 6, cy - 18, cx - 6, cy - 18); // highlight
-
-    // Crossed swords
-    g.lineStyle(3, 0xEEEECC);
-    g.lineBetween(cx - 20, cy - 20, cx + 20, cy + 20);
-    g.lineBetween(cx + 20, cy - 20, cx - 20, cy + 20);
-
-    // Sword guards
-    g.lineStyle(5, 0xDDBB00);
-    g.lineBetween(cx - 9, cy + 7, cx + 9, cy - 7);
-    g.lineBetween(cx + 9, cy + 7, cx - 9, cy - 7);
-
-    // Sword tips (dots)
-    g.fillStyle(0xCCCCAA);
-    g.fillCircle(cx - 20, cy - 20, 2.5); g.fillCircle(cx + 20, cy - 20, 2.5);
-
-    // Two crowns above shield
-    [-20, 20].forEach(dx => {
-      const kx = cx + dx, ky = cy - 64;
-      g.fillStyle(0xFFD700);
-      g.fillRect(kx - 7, ky, 14, 8);
-      g.fillTriangle(kx - 7, ky, kx - 7, ky - 8, kx - 2, ky);
-      g.fillTriangle(kx, ky, kx, ky - 10, kx + 4, ky);
-      g.fillTriangle(kx + 7, ky, kx + 7, ky - 8, kx + 2, ky);
-      g.fillStyle(0xFF3300);
-      g.fillCircle(kx, ky - 1, 2);
+    // Multi-layer glow halos
+    [[0xFFAA00, 0.06, 100], [0xFF7700, 0.07, 76], [0xFFCC00, 0.09, 55]].forEach(([c, a, r]) => {
+      g.fillStyle(c, a); g.fillCircle(cx, cy, r);
     });
 
-    return g;
+    // 8-pointed starburst
+    g.fillStyle(0xFFD700, 0.18);
+    for (let i = 0; i < 8; i++) {
+      const a = (i / 8) * Math.PI * 2;
+      g.fillTriangle(
+        cx, cy,
+        cx + Math.cos(a - 0.18) * 88, cy + Math.sin(a - 0.18) * 88,
+        cx + Math.cos(a + 0.18) * 88, cy + Math.sin(a + 0.18) * 88
+      );
+    }
+
+    // Outer ring (gold)
+    g.fillStyle(0xFFD700); g.fillCircle(cx, cy, 50);
+    // Inner dark ring
+    g.fillStyle(0x0A0005); g.fillCircle(cx, cy, 45);
+
+    // Shield body - outer gold border
+    g.fillStyle(0xCC9900);
+    g.fillTriangle(cx - 30, cy - 30, cx + 30, cy - 30, cx, cy + 44);
+    g.fillRect(cx - 30, cy - 56, 60, 28);
+    // Shield body - bright gold
+    g.fillStyle(0xFFD700);
+    g.fillTriangle(cx - 26, cy - 26, cx + 26, cy - 26, cx, cy + 38);
+    g.fillRect(cx - 26, cy - 52, 52, 28);
+    // Shield inner - deep crimson
+    g.fillStyle(0x7A0000);
+    g.fillTriangle(cx - 20, cy - 20, cx + 20, cy - 20, cx, cy + 30);
+    g.fillRect(cx - 20, cy - 46, 40, 28);
+    // Highlight on shield (top-left)
+    g.fillStyle(0xFF4444, 0.25);
+    g.fillTriangle(cx - 18, cy - 45, cx + 2, cy - 45, cx - 18, cy - 10);
+
+    // Crossed swords
+    g.lineStyle(3.5, 0xDDDDBB, 0.95);
+    g.lineBetween(cx - 20, cy - 24, cx + 20, cy + 22);
+    g.lineBetween(cx + 20, cy - 24, cx - 20, cy + 22);
+    // Sword guards
+    g.lineStyle(5, 0xFFD700, 1);
+    g.lineBetween(cx - 10, cy + 4, cx + 10, cy - 6);
+    g.lineBetween(cx + 10, cy + 4, cx - 10, cy - 6);
+    // Sword tips
+    g.fillStyle(0xEEEECC);
+    g.fillCircle(cx - 20, cy - 24, 3.5); g.fillCircle(cx + 20, cy - 24, 3.5);
+
+    // Center jewel
+    g.fillStyle(0xFF2200); g.fillCircle(cx, cy - 1, 7);
+    g.fillStyle(0xFF7755, 0.55); g.fillCircle(cx - 2, cy - 3, 3.5);
+    g.fillStyle(0xFFAAAA, 0.2); g.fillCircle(cx - 1, cy - 2, 1.5);
+
+    // Crown
+    g.fillStyle(0xFFD700);
+    g.fillRect(cx - 18, cy - 68, 36, 12);
+    g.fillTriangle(cx - 16, cy - 68, cx - 22, cy - 84, cx - 8, cy - 68);
+    g.fillTriangle(cx,     cy - 68, cx,      cy - 88, cx + 8,  cy - 68);
+    g.fillTriangle(cx + 16, cy - 68, cx + 22, cy - 84, cx + 8,  cy - 68);
+    g.fillStyle(0xFFEE88, 0.5); g.fillRect(cx - 16, cy - 66, 32, 4);
+    // Crown gems
+    g.fillStyle(0xFF1100);
+    g.fillCircle(cx - 16, cy - 70, 3.5);
+    g.fillCircle(cx + 1,  cy - 74, 3.5);
+    g.fillCircle(cx + 16, cy - 70, 3.5);
+  }
+
+  _spawnSpark() {
+    const { W, H } = this;
+    const cx = W / 2, cy = H * 0.305;
+    const angle = Math.random() * Math.PI * 2;
+    const dist = 160 + Math.random() * 220;
+    this._sparks.push({
+      x: cx + Math.cos(angle) * dist,
+      y: cy + Math.sin(angle) * dist,
+      vx: -Math.cos(angle) * (0.6 + Math.random() * 0.8),
+      vy: -Math.sin(angle) * (0.6 + Math.random() * 0.8),
+      life: 1,
+      size: 0.8 + Math.random() * 1.8,
+      color: [0xFFD700, 0xFF9900, 0xFF6600, 0xFFFFAA][Math.floor(Math.random() * 4)]
+    });
+  }
+
+  update() {
+    const { W, H } = this;
+    this._sparkG.clear();
+    this._sparks = this._sparks.filter(p => p.life > 0);
+    for (const p of this._sparks) {
+      p.x += p.vx; p.y += p.vy;
+      p.life -= 0.007;
+      if (p.life > 0) {
+        this._sparkG.fillStyle(p.color, Math.min(1, p.life * 1.4));
+        this._sparkG.fillRect(p.x, p.y, p.size, p.size);
+      }
+    }
+
+    // Animate center glow
+    const t = this.time.now / 1000;
+    const pulse = 0.10 + 0.055 * Math.sin(t * 2.8);
+    this._glowG.clear();
+    this._glowG.fillStyle(0xFFAA00, pulse);     this._glowG.fillCircle(W / 2, H * 0.305, 160);
+    this._glowG.fillStyle(0xFFDD00, pulse * 0.5); this._glowG.fillCircle(W / 2, H * 0.305, 90);
+
+    // Animate prompt border
+    if (this._promptBord && this._promptText.alpha > 0) {
+      const ba = 0.5 + 0.5 * Math.sin(t * 3.2);
+      this._promptBord.clear();
+      this._promptBord.lineStyle(1.5, 0xFFD700, ba * 0.8);
+      this._promptBord.strokeRoundedRect(W / 2 - 137, H * 0.87 - 27, 274, 54, 10);
+    }
+  }
+
+  _runSequence(W, H, SY) {
+    // 0.8s: Shield pops in
+    this.tweens.add({
+      targets: this._shieldG, alpha: 1, scaleX: 1, scaleY: 1,
+      duration: 620, ease: 'Back.easeOut', delay: 800
+    });
+
+    // 1.3s: BATTLE crashes down from top
+    this._battleShadow.y -= 80; this._battleText.y -= 80; this._battleHL.y -= 80;
+    this.time.delayedCall(1280, () => {
+      this.tweens.add({ targets: [this._battleShadow, this._battleText, this._battleHL],
+        alpha: 1, y: `+=${80}`, duration: 340, ease: 'Power3.easeOut' });
+      this._battleHL.setAlpha(0);
+      this.tweens.add({ targets: this._battleHL, alpha: 0.10, duration: 500, delay: 300 });
+    });
+
+    // 1.5s: BROS crashes up from bottom
+    this._brosShadow.y += 80; this._brosText.y += 80; this._brosHL.y += 80;
+    this.time.delayedCall(1480, () => {
+      this.tweens.add({ targets: [this._brosShadow, this._brosText, this._brosHL],
+        alpha: 1, y: `-=${80}`, duration: 340, ease: 'Power3.easeOut' });
+      this._brosHL.setAlpha(0);
+      this.tweens.add({ targets: this._brosHL, alpha: 0.08, duration: 500, delay: 300 });
+    });
+
+    // 1.9s: Tagline
+    this.time.delayedCall(1880, () => {
+      this.tweens.add({ targets: this._tagline, alpha: 0.8, duration: 500 });
+    });
+
+    // 2.2s: Prompt + pulse loop
+    this.time.delayedCall(2200, () => {
+      this.tweens.add({ targets: this._promptText, alpha: 1, duration: 400 });
+      this.tweens.add({ targets: this._promptText, alpha: 0.2, duration: 650, yoyo: true, repeat: -1, delay: 400 });
+    });
+
+    // 2.4s: Title idle pulse
+    this.time.delayedCall(2400, () => {
+      this.tweens.add({ targets: [this._battleText, this._brosText],
+        scaleX: 1.02, scaleY: 1.02, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+      this.tweens.add({ targets: this._shieldG,
+        scaleX: 1.04, scaleY: 1.04, duration: 2200, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 300 });
+    });
+
+    // Input unlock at 2.0s, auto-advance at 9s
+    this.time.delayedCall(2000, () => {
+      this.input.once('pointerdown', () => this._proceed());
+      this.input.keyboard?.once('keydown', () => this._proceed());
+      this.time.delayedCall(7000, () => this._proceed());
+    });
   }
 
   _proceed() {
     if (this._proceeded) return;
     this._proceeded = true;
-    this.cameras.main.fadeOut(350, 0, 0, 0);
+    this.cameras.main.fadeOut(380, 0, 0, 0);
     this.cameras.main.once('camerafadeoutcomplete', () => {
       this.scene.start(this.autoLogin ? 'MainMenu' : 'Auth');
     });
