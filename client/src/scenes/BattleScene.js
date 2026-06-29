@@ -8,6 +8,8 @@ import { DRAW_FUNCS } from '../characters/CharacterGraphics.js';
 import * as EmberCrossing from '../maps/EmberCrossing.js';
 import * as FrostpeakArena from '../maps/FrostpeakArena.js';
 
+const DECK_SIZE = 7;
+
 const TOWER_POSITIONS = {
   p1: {
     king:       { x: 240, y: 760 },
@@ -29,9 +31,15 @@ export class BattleScene extends Phaser.Scene {
   init(data) {
     this.matchInfo = data?.matchInfo || this.registry.get('matchInfo');
     this.deck = data?.deck || this.registry.get('deck') || [];
-    this.myUserId = this.registry.get('token')
-      ? JSON.parse(atob(this.registry.get('token').split('.')[1])).id
-      : null;
+    const rawToken = this.registry.get('token');
+    if (rawToken) {
+      try {
+        const b64 = rawToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+        this.myUserId = JSON.parse(atob(b64)).id;
+      } catch { this.myUserId = null; }
+    } else {
+      this.myUserId = null;
+    }
 
     this.mapId = this.matchInfo?.map || 'ember_crossing';
     this.myKey = null; // 'p1' or 'p2'
@@ -50,6 +58,7 @@ export class BattleScene extends Phaser.Scene {
     };
     this.selectedCardIdx = 0;
     this.myElixir = 5;
+    this.overtime = false;
     this.currentUnits = [];
     this.gameOver = false;
   }
@@ -408,6 +417,7 @@ export class BattleScene extends Phaser.Scene {
       if (!serverIds.has(id)) {
         this._playDeathFX(uObj.x, uObj.y);
         uObj.g.destroy();
+        uObj.tintG?.destroy();
         uObj.hpBg.destroy();
         uObj.hpBar.destroy();
         delete this.unitGraphics[id];
@@ -420,6 +430,7 @@ export class BattleScene extends Phaser.Scene {
         // Update position and HP
         const uObj = this.unitGraphics[u.id];
         uObj.g.x = u.x; uObj.g.y = u.y;
+        uObj.tintG.setPosition(u.x, u.y);
         uObj.hpBg.setPosition(u.x, u.y + 28);
         uObj.hpBar.setPosition(u.x, u.y + 28);
         uObj.x = u.x; uObj.y = u.y;
@@ -448,8 +459,9 @@ export class BattleScene extends Phaser.Scene {
 
     // Team tint overlay
     const tintG = this.add.graphics().setDepth(5).setAlpha(0.18);
+    tintG.x = u.x; tintG.y = u.y;
     tintG.fillStyle(u.owner === this.myKey ? 0x0000FF : 0xFF0000);
-    tintG.fillCircle(u.x, u.y, 18);
+    tintG.fillCircle(0, 0, 18);
 
     // HP bar
     const hpBg = this.add.rectangle(u.x, u.y + 28, 32, 5, 0x111111).setDepth(6);
@@ -593,5 +605,3 @@ export class BattleScene extends Phaser.Scene {
     this.battleTimer?.destroy();
   }
 }
-
-const DECK_SIZE = 7;
