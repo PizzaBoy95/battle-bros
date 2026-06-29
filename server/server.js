@@ -51,5 +51,5 @@ getDb(); // Initialize database
 
 server.listen(PORT, () => {
   console.log(`[Server] Battle Bros server running on port ${PORT}`);
-  console.log(`[Server] Client origin: ${CLIENT_ORIGIN}`);
+  console.log(`[Server] CORS origin: ${IS_PROD ? '*' : 'localhost'}`);
 });
