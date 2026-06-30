@@ -142,97 +142,116 @@ export class CharSelectScene extends Phaser.Scene {
     const CW = CARD_W - 2, CH = CARD_H - 2;
     const lx = cx - CW / 2, ly = cy - CH / 2;
 
-    // ── Background layers (gradient simulation) ─────────────────────────────
-    const bg = this.add.rectangle(cx, cy, CW, CH, 0x0a0a1e);
+    // ── Dark card background ────────────────────────────────────────────────
+    const bg = this.add.rectangle(cx, cy, CW, CH, 0x07071a);
 
-    // Rarity color gradient at top
-    const grad1 = this.add.rectangle(cx, ly + CH * 0.20, CW, CH * 0.40, rc, 0.20);
-    const grad2 = this.add.rectangle(cx, ly + CH * 0.08, CW, CH * 0.18, rc, 0.12);
-    const topShine = this.add.rectangle(cx, ly + 2, CW, 4, 0xFFFFFF, 0.06);
+    // Rarity-tinted top gradient wash
+    const grad1 = this.add.rectangle(cx, ly + CH * 0.28, CW, CH * 0.56, rc, 0.18);
+    const grad2 = this.add.rectangle(cx, ly + CH * 0.10, CW, CH * 0.22, rc, 0.10);
+    // Left-edge shine (lighting illusion)
+    const topShine = this.add.rectangle(lx + 2, cy, 3, CH - 2, 0xFFFFFF, 0.07);
 
-    // Top rarity color stripe
-    const topStripe = this.add.rectangle(cx, ly + 2, CW, 4, rc, 0.85);
-
-    // ── Border (drawn separately so we can redraw on select) ────────────────
+    // ── 4px rarity border ──────────────────────────────────────────────────
     const border = this.add.graphics();
     this._drawCardBorder(border, cx, cy, CW, CH, rc, isSel);
 
-    // ── Character portrait ──────────────────────────────────────────────────
-    // Use canvas-generated portrait texture (always available, crisp at any size)
+    // ── Character portrait — top 68% of card ───────────────────────────────
+    const PORTRAIT_H = CH * 0.68;
+    const portraitCY = ly + PORTRAIT_H / 2;
     const portraitKey = charId + '_p';
     let portrait;
     if (this.textures.exists(portraitKey)) {
-      portrait = this.add.image(cx, cy - 12, portraitKey)
-        .setDisplaySize(CW - 4, CH * 0.60)
+      portrait = this.add.image(cx, portraitCY, portraitKey)
+        .setDisplaySize(CW, PORTRAIT_H)
         .setDepth(1);
     } else {
       portrait = this.add.graphics().setDepth(1);
-      portrait.x = cx; portrait.y = cy - 10;
+      portrait.x = cx; portrait.y = portraitCY;
       const fn = DRAW_FUNCS[charId];
       if (fn) fn(portrait);
       portrait.setScale(0.62);
     }
 
-    // ── Rarity banner at bottom ─────────────────────────────────────────────
-    const bannerH = 20;
-    const bannerY = cy + CH / 2 - bannerH / 2 - 1;
-    const banner  = this.add.rectangle(cx, bannerY, CW, bannerH, rc, 0.88).setDepth(2);
-    const banShine= this.add.rectangle(cx - CW * 0.12, bannerY - bannerH * 0.22, CW * 0.38, bannerH * 0.38, 0xFFFFFF, 0.12).setDepth(2);
-    const rarLbl  = this.add.text(cx, bannerY + 3, char.rarity.toUpperCase(), {
+    // ── Dark name plate — bottom 30% overlay ───────────────────────────────
+    const plateH = CH * 0.32;
+    const plateY = cy + CH / 2 - plateH / 2;
+    const plateBg = this.add.graphics().setDepth(2);
+    plateBg.fillStyle(0x000000, 0.72); plateBg.fillRect(lx, cy + CH / 2 - plateH, CW, plateH);
+    // Rarity strip along bottom of name plate
+    plateBg.fillStyle(rc, 0.90); plateBg.fillRect(lx, cy + CH / 2 - 18, CW, 18);
+    // Inner shine on rarity strip
+    plateBg.fillStyle(0xFFFFFF, 0.14); plateBg.fillRect(lx + 6, cy + CH / 2 - 17, CW * 0.35, 8);
+
+    // Rarity initial ribbon (diagonal top-right corner)
+    const ribG = this.add.graphics().setDepth(3);
+    const RIB = 22;
+    ribG.fillStyle(rc, 0.9);
+    ribG.fillTriangle(lx + CW - RIB, ly, lx + CW, ly, lx + CW, ly + RIB);
+    const rarInitial = { legendary: 'L', epic: 'E', rare: 'R', common: 'C' }[char.rarity] || '?';
+    const ribLbl = this.add.text(lx + CW - 7, ly + 7, rarInitial, {
+      fontSize: '7px', fill: '#000', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+    }).setOrigin(0.5).setDepth(4);
+
+    // Rarity label inside strip
+    const rarLbl = this.add.text(cx, cy + CH / 2 - 9, char.rarity.toUpperCase(), {
       fontSize: '7px', fill: '#000000', fontFamily: 'Arial', fontStyle: 'bold'
     }).setOrigin(0.5).setDepth(3);
 
-    // Name (above banner)
-    const nameY = bannerY - 12;
-    const name  = this.add.text(cx, nameY, char.name, {
+    // Character name
+    const name = this.add.text(cx, cy + CH / 2 - plateH + 11, char.name, {
       fontSize: '8px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold',
       stroke: '#000000', strokeThickness: 2,
-      wordWrap: { width: CW - 6 }
+      wordWrap: { width: CW - 8 }
     }).setOrigin(0.5).setDepth(3);
 
-    // ── Elixir badge (top-left) ─────────────────────────────────────────────
-    const egX = lx + 12, egY = ly + 12;
-    const eg = this.add.graphics().setDepth(3);
-    eg.fillStyle(0x5A0099); eg.fillCircle(egX, egY, 12);
-    eg.fillStyle(0x8822CC, 0.5); eg.fillCircle(egX - 1, egY - 1, 8);
-    eg.lineStyle(1.5, 0xCC88FF, 0.6); eg.strokeCircle(egX, egY, 12);
-    const eLbl = this.add.text(egX, egY, String(char.elixirCost), {
-      fontSize: '13px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#220044', strokeThickness: 2
-    }).setOrigin(0.5).setDepth(4);
+    // ── Elixir badge (top-left, larger) ────────────────────────────────────
+    const egX = lx + 14, egY = ly + 14;
+    const eg = this.add.graphics().setDepth(4);
+    eg.fillStyle(0x4A0088); eg.fillCircle(egX, egY, 14);
+    eg.fillStyle(0x9933DD, 0.55); eg.fillCircle(egX - 1.5, egY - 2, 9);
+    eg.lineStyle(2, 0xCC88FF, 0.75); eg.strokeCircle(egX, egY, 14);
+    const eLbl = this.add.text(egX, egY + 1, String(char.elixirCost), {
+      fontSize: '14px', fill: '#FFFFFF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+      stroke: '#220044', strokeThickness: 3
+    }).setOrigin(0.5).setDepth(5);
 
     // ── Level badge (top-right) ─────────────────────────────────────────────
-    const lvX = lx + CW - 12, lvY = ly + 12;
-    const lvG = this.add.graphics().setDepth(3);
-    lvG.fillStyle(0x080814); lvG.fillCircle(lvX, lvY, 12);
-    lvG.lineStyle(2, rc, 0.9); lvG.strokeCircle(lvX, lvY, 12);
-    const lvLbl = this.add.text(lvX, lvY, String(cd.level || 1), {
-      fontSize: '12px', fontStyle: 'bold', fontFamily: 'Arial',
+    const lvX = lx + CW - 14, lvY = ly + 14;
+    const lvG = this.add.graphics().setDepth(4);
+    lvG.fillStyle(0x05050f); lvG.fillCircle(lvX, lvY, 13);
+    lvG.lineStyle(2.5, rc, 0.95); lvG.strokeCircle(lvX, lvY, 13);
+    const lvLbl = this.add.text(lvX, lvY + 1, `${cd.level || 1}`, {
+      fontSize: '12px', fontStyle: 'bold', fontFamily: 'Arial Black, Arial',
       fill: `#${rc.toString(16).padStart(6, '0')}`
-    }).setOrigin(0.5).setDepth(4);
-
-    // ── Selected checkmark ──────────────────────────────────────────────────
-    const sel = this.add.text(cx, cy - 14, isSel ? '✓' : '', {
-      fontSize: '24px', fill: '#FFD700', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 3
     }).setOrigin(0.5).setDepth(5);
+
+    // ── Selected checkmark overlay ──────────────────────────────────────────
+    const sel = this.add.text(cx, portraitCY, isSel ? '✓' : '', {
+      fontSize: '28px', fill: '#FFD700', fontFamily: 'Arial', fontStyle: 'bold',
+      stroke: '#000000', strokeThickness: 4
+    }).setOrigin(0.5).setDepth(5);
+    // Selected gold overlay tint
+    const selOverlay = this.add.rectangle(cx, cy, CW, CH, 0xFFD700, isSel ? 0.08 : 0).setDepth(2);
+
+    const banShine = topShine; // alias so destroy loop still works
 
     // ── Interaction ─────────────────────────────────────────────────────────
     const zone = this.add.zone(cx, cy, CARD_W, CARD_H).setInteractive({ useHandCursor: true }).setDepth(6);
     zone.on('pointerdown', () => this._toggleCard(charId));
+    const cardParts = [bg, grad1, grad2, border, plateBg, portrait, name, sel];
     zone.on('pointerover', () => {
-      this.tweens.add({ targets: [bg, grad1, grad2, border, banner, name, sel], scaleX: 1.07, scaleY: 1.07, duration: 90, ease: 'Power1' });
+      this.tweens.add({ targets: cardParts, scaleX: 1.08, scaleY: 1.08, duration: 90, ease: 'Power1' });
       this._showInfo(charId);
       this._runShimmer(cx, cy, CW, CH);
     });
     zone.on('pointerout', () => {
-      this.tweens.add({ targets: [bg, grad1, grad2, border, banner, name, sel], scaleX: 1, scaleY: 1, duration: 90, ease: 'Power1' });
+      this.tweens.add({ targets: cardParts, scaleX: 1, scaleY: 1, duration: 90, ease: 'Power1' });
     });
 
     this.cards[charId] = {
       cx, cy, CW, CH, rc,
-      bg, grad1, grad2, border, portrait, banner, banShine, rarLbl, name,
-      eg, eLbl, lvG, lvLbl, sel, zone, charId
+      bg, grad1, grad2, border, portrait, plateBg, banShine, rarLbl, name,
+      ribG, ribLbl, eg, eLbl, lvG, lvLbl, sel, selOverlay, zone, charId
     };
   }
 
@@ -240,15 +259,18 @@ export class CharSelectScene extends Phaser.Scene {
     g.clear();
     const lx = cx - CW / 2, ly = cy - CH / 2;
     if (isSel) {
-      g.lineStyle(3, 0xFFD700, 1);
-      g.strokeRect(lx, ly, CW, CH);
-      g.lineStyle(7, 0xFFD700, 0.12);
-      g.strokeRect(lx - 3, ly - 3, CW + 6, CH + 6);
-      g.fillStyle(0xFFD700, 0.08);
-      g.fillRect(lx, ly, CW, CH);
+      // Gold glow outer halo
+      g.lineStyle(10, 0xFFD700, 0.15); g.strokeRect(lx - 4, ly - 4, CW + 8, CH + 8);
+      g.lineStyle(6, 0xFFD700, 0.30);  g.strokeRect(lx - 2, ly - 2, CW + 4, CH + 4);
+      // Main gold border
+      g.lineStyle(4, 0xFFD700, 1.0);   g.strokeRect(lx, ly, CW, CH);
+      // Inner 1px dark shadow line
+      g.lineStyle(1, 0x000000, 0.5);   g.strokeRect(lx + 2, ly + 2, CW - 4, CH - 4);
     } else {
-      g.lineStyle(1.5, rc, 0.40);
-      g.strokeRect(lx, ly, CW, CH);
+      // 4px rarity border
+      g.lineStyle(4, rc, 0.85);        g.strokeRect(lx, ly, CW, CH);
+      // Inner 1px shadow
+      g.lineStyle(1, 0x000000, 0.45);  g.strokeRect(lx + 2, ly + 2, CW - 4, CH - 4);
     }
   }
 
@@ -420,6 +442,7 @@ export class CharSelectScene extends Phaser.Scene {
       const isSel = this.selectedDeck.includes(charId);
       this._drawCardBorder(card.border, card.cx, card.cy, card.CW, card.CH, card.rc, isSel);
       card.sel.setText(isSel ? '✓' : '');
+      if (card.selOverlay) card.selOverlay.setAlpha(isSel ? 0.08 : 0);
     }
     this._redrawDeckBar();
 

@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import { socketManager } from '../network/SocketManager.js';
 import { audioSystem } from '../systems/AudioSystem.js';
 import { DRAW_FUNCS } from '../characters/CharacterGraphics.js';
-import { CHARACTER_IDS } from '../characters/CharacterRegistry.js';
+import { CHARACTER_IDS, CHARACTERS } from '../characters/CharacterRegistry.js';
 
 const PARADE_IDS = [
   'titan_grunt','pyro_drake','lady_vex','iron_bro',
@@ -231,47 +231,53 @@ export class MainMenuScene extends Phaser.Scene {
   // ══════════════════════════════════════════════════════════════════════════
   _drawCharacterParade() {
     const { W, H } = this;
-    const paradeY = H * 0.635;
+    const paradeY = H * 0.630;
     const count   = PARADE_IDS.length;
     const gap     = W / count;
 
     // Ground shadow strip
     const sg = this.add.graphics().setDepth(11);
-    sg.fillStyle(0x000000, 0.30); sg.fillEllipse(W/2, paradeY + 32, W * 0.92, 18);
+    sg.fillStyle(0x000000, 0.28); sg.fillEllipse(W / 2, paradeY + 40, W * 0.94, 16);
+
+    // Rarity glow colors for parade halos
+    const RARITY_GLOW = { legendary: 0xFFD700, epic: 0xAA44FF, rare: 0x4488FF, common: 0x888888 };
 
     PARADE_IDS.forEach((charId, i) => {
       const cx = gap * i + gap / 2;
-      const cy = paradeY + (i % 2 === 0 ? 0 : -8); // slight height variation
+      const cy = paradeY + (i % 2 === 0 ? 0 : -10);
+      const char = CHARACTERS?.[charId];
+      const glowCol = RARITY_GLOW[char?.rarity] ?? 0x888888;
 
-      // Character portrait (use _p texture if available)
+      // Team-color glow halo behind character
+      const haloG = this.add.graphics().setDepth(11);
+      haloG.fillStyle(glowCol, 0.18); haloG.fillEllipse(cx, cy + 8, 68, 32);
+      haloG.fillStyle(glowCol, 0.10); haloG.fillEllipse(cx, cy + 4, 52, 48);
+
+      // Character portrait — 56×72 (larger than before)
       const pKey = charId + '_p';
+      let unitObj;
       if (this.textures.exists(pKey)) {
-        const img = this.add.image(cx, cy, pKey)
-          .setDisplaySize(44, 56)
-          .setDepth(12);
-        // Gentle bob
-        this.tweens.add({
-          targets: img, y: cy - 5,
-          duration: 900 + i * 80, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
-        });
+        unitObj = this.add.image(cx, cy, pKey).setDisplaySize(56, 72).setDepth(12);
       } else {
-        // Fallback: DRAW_FUNCS
-        const g = this.add.graphics().setDepth(12);
-        g.x = cx; g.y = cy;
-        if (DRAW_FUNCS[charId]) DRAW_FUNCS[charId](g);
-        g.setScale(0.55);
-        this.tweens.add({ targets: g, y: cy - 5, duration: 900+i*80, yoyo:true, repeat:-1, ease:'Sine.easeInOut' });
+        unitObj = this.add.graphics().setDepth(12);
+        unitObj.x = cx; unitObj.y = cy;
+        if (DRAW_FUNCS[charId]) DRAW_FUNCS[charId](unitObj);
+        unitObj.setScale(0.65);
       }
 
-      // Individual shadow under each character
+      // Gentle bob tween
+      this.tweens.add({
+        targets: [unitObj, haloG], y: `-=7`,
+        duration: 850 + i * 90, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+      });
+
+      // Foot shadow
       const sh = this.add.graphics().setDepth(11);
-      sh.fillStyle(0x000000, 0.25); sh.fillEllipse(cx, paradeY + 34, 32, 8);
+      sh.fillStyle(0x000000, 0.28); sh.fillEllipse(cx, paradeY + 38, 36, 9);
     });
 
-    // Label
-    this.add.text(W/2, paradeY + 44, 'YOUR WARRIORS AWAIT', {
-      fontSize: '9px', fill: '#4a8a5a', fontFamily: 'Arial',
-      letterSpacing: 3
+    this.add.text(W / 2, paradeY + 52, 'YOUR WARRIORS AWAIT', {
+      fontSize: '9px', fill: '#5aaa6a', fontFamily: 'Arial', letterSpacing: 3
     }).setOrigin(0.5).setDepth(12);
   }
 
@@ -341,6 +347,13 @@ export class MainMenuScene extends Phaser.Scene {
     btn.on('pointerdown',()=>this._goCharSelect('1v1'));
     btn.on('pointerover',()=>{bb.setAlpha(0.82);btn.setScale(1.05);});
     btn.on('pointerout', ()=>{bb.setAlpha(1);btn.setScale(1);});
+    // Repeating shimmer pan across BATTLE button every 3.5s
+    const _shimmerBattle = () => {
+      const sh = this.add.rectangle(16, rowY + 8, 28, 34, 0xFFFFFF, 0.28).setDepth(14).setOrigin(0,0);
+      this.tweens.add({ targets: sh, x: 16 + bw, duration: 500, ease: 'Linear', onComplete: () => sh.destroy() });
+      this.time.delayedCall(3500, _shimmerBattle);
+    };
+    this.time.delayedCall(1200, _shimmerBattle);
 
     // ── 2v2 ───────────────────────────────────────────────────────────────
     const bx2=16+bw+4, bw2=W-32-bw-4;
