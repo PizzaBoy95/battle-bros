@@ -276,20 +276,19 @@ export class BattleScene extends Phaser.Scene {
 
   _buildHandCards() {
     const { width: W, height: H } = this.scale;
-    // Bigger cards for easy mobile tapping
-    const CARD_W = 64, CARD_H = 86;
-    const GAP = 7;
+    const CARD_W = 64, CARD_H = 96;
+    const GAP = 6;
     const totalCards = Math.min(this.deck.length, DECK_SIZE);
     const totalW = totalCards * (CARD_W + GAP) - GAP;
     const startX = W / 2 - totalW / 2 + CARD_W / 2;
-    // Card bar background
+    // Card tray background — rounded top edge
     const barG = this.add.graphics().setDepth(7);
-    barG.fillStyle(0x05050F, 0.92);
-    barG.fillRect(0, H - CARD_H - 28, W, CARD_H + 28);
-    barG.lineStyle(1, 0x334466, 0.6);
-    barG.strokeRect(0, H - CARD_H - 28, W, 1);
+    barG.fillStyle(0x040410, 0.95);
+    barG.fillRoundedRect(0, H - CARD_H - 32, W, CARD_H + 32, { tl: 14, tr: 14, bl: 0, br: 0 });
+    barG.lineStyle(1.5, 0x2244AA, 0.45);
+    barG.strokeRoundedRect(0, H - CARD_H - 32, W, CARD_H + 32, { tl: 14, tr: 14, bl: 0, br: 0 });
 
-    const cardY = H - CARD_H / 2 - 12;
+    const cardY = H - CARD_H / 2 - 14;
 
     this.handCards = [];
 
@@ -302,57 +301,64 @@ export class BattleScene extends Phaser.Scene {
       const cx = startX + i * (CARD_W + GAP);
       const isSelected = i === this.selectedCardIdx;
       const rarityColor = RARITY_COLORS[char.rarity] || 0x888888;
+      // Selected card lifts up slightly
+      const cy = isSelected ? cardY - 6 : cardY;
 
       const cardG = this.add.graphics().setDepth(8);
 
       // Card shadow
-      cardG.fillStyle(0x000000, 0.5);
-      cardG.fillRoundedRect(cx - CARD_W / 2 + 3, cardY - CARD_H / 2 + 3, CARD_W, CARD_H, 7);
+      cardG.fillStyle(0x000000, 0.55);
+      cardG.fillRoundedRect(cx - CARD_W / 2 + 3, cy - CARD_H / 2 + 3, CARD_W, CARD_H, 8);
 
-      // Card body
-      cardG.fillStyle(isSelected ? 0x1E1E3C : 0x0E0E20);
-      cardG.fillRoundedRect(cx - CARD_W / 2, cardY - CARD_H / 2, CARD_W, CARD_H, 7);
+      // Card body — selected has richer blue tint
+      cardG.fillStyle(isSelected ? 0x1A1A44 : 0x0D0D1E);
+      cardG.fillRoundedRect(cx - CARD_W / 2, cy - CARD_H / 2, CARD_W, CARD_H, 8);
+      // Subtle inner top highlight
+      cardG.fillStyle(0xFFFFFF, 0.04);
+      cardG.fillRoundedRect(cx - CARD_W / 2 + 2, cy - CARD_H / 2 + 2, CARD_W - 4, CARD_H * 0.45, 6);
 
-      // Rarity stripe at bottom of card
-      cardG.fillStyle(rarityColor, 0.7);
-      cardG.fillRoundedRect(cx - CARD_W / 2, cardY + CARD_H / 2 - 10, CARD_W, 10, { bl: 7, br: 7, tl: 0, tr: 0 });
+      // Rarity stripe at bottom
+      cardG.fillStyle(rarityColor, 0.75);
+      cardG.fillRoundedRect(cx - CARD_W / 2, cy + CARD_H / 2 - 11, CARD_W, 11, { bl: 8, br: 8, tl: 0, tr: 0 });
 
       // Border
-      cardG.lineStyle(isSelected ? 2.5 : 1.5, isSelected ? 0xFFD700 : rarityColor, isSelected ? 1 : 0.45);
-      cardG.strokeRoundedRect(cx - CARD_W / 2, cardY - CARD_H / 2, CARD_W, CARD_H, 7);
+      cardG.lineStyle(isSelected ? 3 : 1.5, isSelected ? 0xFFD700 : rarityColor, isSelected ? 1 : 0.5);
+      cardG.strokeRoundedRect(cx - CARD_W / 2, cy - CARD_H / 2, CARD_W, CARD_H, 8);
 
-      // If selected: gold glow outline
+      // Selected: layered gold glow
       if (isSelected) {
-        cardG.lineStyle(5, 0xFFD700, 0.18);
-        cardG.strokeRoundedRect(cx - CARD_W / 2 - 2, cardY - CARD_H / 2 - 2, CARD_W + 4, CARD_H + 4, 9);
+        cardG.lineStyle(8, 0xFFD700, 0.12);
+        cardG.strokeRoundedRect(cx - CARD_W / 2 - 3, cy - CARD_H / 2 - 3, CARD_W + 6, CARD_H + 6, 11);
+        cardG.lineStyle(4, 0xFFD700, 0.22);
+        cardG.strokeRoundedRect(cx - CARD_W / 2 - 1, cy - CARD_H / 2 - 1, CARD_W + 2, CARD_H + 2, 9);
       }
 
-      // Character drawing (centered in upper 3/4 of card)
+      // Character drawing
       const charG = this.add.graphics().setDepth(9);
-      charG.x = cx; charG.y = cardY - 8;
+      charG.x = cx; charG.y = cy - 8;
       const fn = DRAW_FUNCS[charId];
       if (fn) fn(charG);
-      charG.setScale(0.42);
+      charG.setScale(0.44);
 
       // Elixir cost badge (top-left)
       const elixirG = this.add.graphics().setDepth(9);
-      elixirG.fillStyle(0x6C1D9E);
-      elixirG.fillCircle(cx - CARD_W / 2 + 13, cardY - CARD_H / 2 + 13, 12);
-      elixirG.lineStyle(1.5, 0xDD88FF, 0.7);
-      elixirG.strokeCircle(cx - CARD_W / 2 + 13, cardY - CARD_H / 2 + 13, 12);
-      const costText = this.add.text(cx - CARD_W / 2 + 13, cardY - CARD_H / 2 + 13,
+      elixirG.fillStyle(0x5A1188);
+      elixirG.fillCircle(cx - CARD_W / 2 + 13, cy - CARD_H / 2 + 13, 13);
+      elixirG.lineStyle(1.5, 0xCC66FF, 0.8);
+      elixirG.strokeCircle(cx - CARD_W / 2 + 13, cy - CARD_H / 2 + 13, 13);
+      const costText = this.add.text(cx - CARD_W / 2 + 13, cy - CARD_H / 2 + 13,
         String(char.elixirCost), {
-          fontSize: '12px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold'
+          fontSize: '13px', fill: '#FFFFFF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
         }).setOrigin(0.5).setDepth(10);
 
       // Character name at bottom
-      const nameText = this.add.text(cx, cardY + CARD_H / 2 - 5,
+      const nameText = this.add.text(cx, cy + CARD_H / 2 - 6,
         char.name.split(' ')[0].slice(0, 8), {
-          fontSize: '9px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold'
+          fontSize: '9px', fill: '#CCCCFF', fontFamily: 'Arial', fontStyle: 'bold'
         }).setOrigin(0.5).setDepth(10);
 
       // Large interactive hit zone — full card area + extra padding for fat fingers
-      const zone = this.add.zone(cx, cardY, CARD_W + 14, CARD_H + 14)
+      const zone = this.add.zone(cx, cardY, CARD_W + 14, CARD_H + 20)
         .setInteractive({ useHandCursor: true }).setDepth(11);
 
       zone.on('pointerdown', (ptr) => {
@@ -362,40 +368,63 @@ export class BattleScene extends Phaser.Scene {
         this._startDrag(i, ptr);
       });
 
-      this.handCards.push({ charId, cx, cardY, cardG, charG, elixirG, costText, nameText, zone, idx: i });
+      this.handCards.push({ charId, cx, cardY, cy, cardG, charG, elixirG, costText, nameText, zone, idx: i });
     }
     this.DECK_SIZE = totalCards;
   }
 
   _refreshHandCards() {
-    const CW = 64, CH = 86;
+    const CW = 64, CH = 96;
     for (const card of this.handCards) {
       const char = CHARACTERS[card.charId];
       const isSelected = card.idx === this.selectedCardIdx;
       const canAfford = char && this.myElixir >= char.elixirCost;
       const rarityColor = RARITY_COLORS[char?.rarity] || 0x888888;
+      const cy = isSelected ? card.cardY - 6 : card.cardY;
+      const alpha = canAfford ? 1 : 0.5;
 
       card.cardG.clear();
-      const alpha = canAfford ? 1 : 0.45;
 
-      card.cardG.fillStyle(0x000000, 0.5 * alpha);
-      card.cardG.fillRoundedRect(card.cx - CW / 2 + 3, card.cardY - CH / 2 + 3, CW, CH, 7);
+      // Shadow
+      card.cardG.fillStyle(0x000000, 0.55 * alpha);
+      card.cardG.fillRoundedRect(card.cx - CW / 2 + 3, cy - CH / 2 + 3, CW, CH, 8);
 
-      card.cardG.fillStyle(isSelected ? 0x1E1E3C : 0x0E0E20, alpha);
-      card.cardG.fillRoundedRect(card.cx - CW / 2, card.cardY - CH / 2, CW, CH, 7);
+      // Body — red tint when can't afford
+      const bodyCol = !canAfford ? 0x1A0808 : isSelected ? 0x1A1A44 : 0x0D0D1E;
+      card.cardG.fillStyle(bodyCol, alpha);
+      card.cardG.fillRoundedRect(card.cx - CW / 2, cy - CH / 2, CW, CH, 8);
+      card.cardG.fillStyle(0xFFFFFF, 0.04 * alpha);
+      card.cardG.fillRoundedRect(card.cx - CW / 2 + 2, cy - CH / 2 + 2, CW - 4, CH * 0.45, 6);
 
-      card.cardG.fillStyle(rarityColor, 0.7 * alpha);
-      card.cardG.fillRoundedRect(card.cx - CW / 2, card.cardY + CH / 2 - 10, CW, 10, { bl: 7, br: 7, tl: 0, tr: 0 });
+      // Rarity stripe
+      card.cardG.fillStyle(rarityColor, 0.75 * alpha);
+      card.cardG.fillRoundedRect(card.cx - CW / 2, cy + CH / 2 - 11, CW, 11, { bl: 8, br: 8, tl: 0, tr: 0 });
 
-      card.cardG.lineStyle(isSelected ? 2.5 : 1.5, isSelected ? 0xFFD700 : rarityColor, isSelected ? alpha : 0.4 * alpha);
-      card.cardG.strokeRoundedRect(card.cx - CW / 2, card.cardY - CH / 2, CW, CH, 7);
+      // Border
+      const borderCol = !canAfford ? 0xFF2222 : isSelected ? 0xFFD700 : rarityColor;
+      card.cardG.lineStyle(isSelected ? 3 : 1.5, borderCol, isSelected ? 1 : 0.55 * alpha);
+      card.cardG.strokeRoundedRect(card.cx - CW / 2, cy - CH / 2, CW, CH, 8);
 
       if (isSelected) {
-        card.cardG.lineStyle(5, 0xFFD700, 0.18);
-        card.cardG.strokeRoundedRect(card.cx - CW / 2 - 2, card.cardY - CH / 2 - 2, CW + 4, CH + 4, 9);
+        card.cardG.lineStyle(8, 0xFFD700, 0.12);
+        card.cardG.strokeRoundedRect(card.cx - CW / 2 - 3, cy - CH / 2 - 3, CW + 6, CH + 6, 11);
+        card.cardG.lineStyle(4, 0xFFD700, 0.22);
+        card.cardG.strokeRoundedRect(card.cx - CW / 2 - 1, cy - CH / 2 - 1, CW + 2, CH + 2, 9);
       }
 
-      card.charG.setAlpha(canAfford ? 1 : 0.3);
+      // Elixir badge — red when can't afford
+      card.elixirG.clear();
+      const badgeCol = canAfford ? 0x5A1188 : 0x881122;
+      const badgeBorder = canAfford ? 0xCC66FF : 0xFF4444;
+      card.elixirG.fillStyle(badgeCol);
+      card.elixirG.fillCircle(card.cx - CW / 2 + 13, cy - CH / 2 + 13, 13);
+      card.elixirG.lineStyle(1.5, badgeBorder, 0.8);
+      card.elixirG.strokeCircle(card.cx - CW / 2 + 13, cy - CH / 2 + 13, 13);
+      card.costText.setColor(canAfford ? '#FFFFFF' : '#FF8888');
+
+      card.charG.setAlpha(canAfford ? 1 : 0.28);
+      card.charG.y = cy - 8;
+      card.nameText.y = cy + CH / 2 - 6;
     }
   }
 
