@@ -774,13 +774,144 @@ export class BattleScene extends Phaser.Scene {
   _onGameEvent(evt) {
     if (evt.type === 'unit_hit' || evt.type === 'tower_hit') {
       this._showDamageNumber(evt.x, evt.y, evt.damage);
+      if (evt.charId) this._playAttackFX(evt.charId, evt.fromX ?? evt.x, evt.fromY ?? evt.y, evt.x, evt.y);
       audioSystem.playHit();
     }
-    if (evt.type === 'tower_destroyed') {
-      audioSystem.playTowerDestroyed();
-    }
+    if (evt.type === 'tower_destroyed') { audioSystem.playTowerDestroyed(); }
     if (evt.type === 'tower_attack') {
+      if (evt.charId) this._playAttackFX(evt.charId, evt.fromX ?? evt.x, evt.fromY ?? evt.y, evt.toX ?? evt.x, evt.toY ?? evt.y);
       audioSystem.playTowerHit();
+    }
+  }
+
+  _playAttackFX(charId, fx, fy, tx, ty) {
+    const g = this.add.graphics().setDepth(14);
+    const dx = tx - fx, dy = ty - fy;
+    const dist = Math.sqrt(dx * dx + dy * dy) || 1;
+    const nx = dx / dist, ny = dy / dist;
+
+    const _arc = (col, r, dur, onDone) => {
+      g.fillStyle(col, 0.9); g.fillCircle(0, 0, r);
+      g.x = fx; g.y = fy;
+      this.tweens.add({ targets: g, x: tx, y: ty, duration: dur, ease: 'Linear', onComplete: () => { if (onDone) onDone(); g.destroy(); } });
+    };
+    const _ring = (x, y, col, rMax, dur) => {
+      const rg = this.add.graphics().setDepth(14);
+      rg.lineStyle(3, col, 0.8); rg.strokeCircle(x, y, 4);
+      this.tweens.add({ targets: rg, scaleX: rMax / 4, scaleY: rMax / 4, alpha: 0, duration: dur, onComplete: () => rg.destroy() });
+    };
+    const _line = (col, lw, dur) => {
+      g.lineStyle(lw, col, 0.85); g.lineBetween(fx, fy, tx, ty);
+      this.tweens.add({ targets: g, alpha: 0, duration: dur, onComplete: () => g.destroy() });
+    };
+    const _pool = (x, y, col, rMax, dur) => {
+      const pg = this.add.graphics().setDepth(7);
+      pg.fillStyle(col, 0.55); pg.fillCircle(x, y, 4);
+      this.tweens.add({ targets: pg, scaleX: rMax / 4, scaleY: rMax / 4 * 0.4, alpha: 0, duration: dur, onComplete: () => pg.destroy() });
+    };
+
+    switch (charId) {
+      case 'titan_grunt':
+        _ring(tx, ty, 0xAAAAAA, 40, 400); break;
+      case 'pyro_drake':
+        g.fillStyle(0xFF6600, 0.9); g.fillCircle(0, 0, 10);
+        g.x = fx; g.y = fy;
+        this.tweens.add({ targets: g, x: tx, y: ty, duration: 380, ease: 'Quad.Out', onComplete: () => { _pool(tx, ty, 0xFF4400, 30, 500); g.destroy(); } });
+        break;
+      case 'lady_vex':
+        g.lineStyle(3, 0xCC44FF, 0.85);
+        g.lineBetween(fx, fy, fx + dx * 0.4 + ny * 18, fy + dy * 0.4 - nx * 18);
+        g.lineBetween(fx + dx * 0.4 + ny * 18, fy + dy * 0.4 - nx * 18, tx, ty);
+        this.tweens.add({ targets: g, alpha: 0, duration: 260, onComplete: () => g.destroy() });
+        break;
+      case 'bone_shard':
+        g.fillStyle(0x88FF88, 0.85); g.fillCircle(0, 0, 8);
+        g.x = fx; g.y = fy;
+        this.tweens.add({ targets: g, x: tx, y: ty, duration: 500, ease: 'Sine.InOut', onComplete: () => g.destroy() });
+        break;
+      case 'iron_bro':
+        _ring(tx, ty, 0x2266FF, 30, 300); break;
+      case 'stone_golem':
+        g.fillStyle(0x888888, 0.9); g.fillCircle(0, 0, 14);
+        g.x = fx; g.y = fy;
+        this.tweens.add({ targets: g, x: tx, y: ty, duration: 450, ease: 'Quad.In', onComplete: () => { _ring(tx, ty, 0x888888, 36, 350); g.destroy(); } });
+        break;
+      case 'thunder_chief':
+        _line(0xFFEE00, 3, 130);
+        this.time.delayedCall(65, () => _line(0xFFFFAA, 2, 80));
+        break;
+      case 'blaze_witch':
+        _pool(tx, ty, 0xFF4400, 38, 700); break;
+      case 'wing_knight':
+        _line(0xFFFFFF, 4, 160);
+        _ring(tx, ty, 0xFFFFFF, 24, 260);
+        break;
+      case 'frostborn': {
+        g.fillStyle(0xAADDFF, 0.9);
+        g.fillTriangle(0, -7, -5, 5, 5, 5);
+        g.x = fx; g.y = fy;
+        this.tweens.add({ targets: g, x: tx, y: ty, duration: 420, ease: 'Linear', onComplete: () => g.destroy() });
+        break;
+      }
+      case 'jade_monk':
+        _ring(fx, fy, 0x00FF88, 28, 500);
+        _ring(fx, fy, 0x00CC66, 20, 400);
+        break;
+      case 'sea_crusher':
+        g.fillStyle(0x00AACC, 0.8); g.fillEllipse(0, 0, 18, 10);
+        g.x = fx; g.y = fy; g.rotation = Math.atan2(dy, dx);
+        this.tweens.add({ targets: g, x: tx, y: ty, duration: 350, ease: 'Linear', onComplete: () => g.destroy() });
+        break;
+      case 'crystal_sage':
+        [-10, 0, 10].forEach(off => {
+          const sg = this.add.graphics().setDepth(14);
+          sg.fillStyle(0xCC88FF, 0.85);
+          sg.fillTriangle(0, -6, -4, 4, 4, 4);
+          sg.x = fx; sg.y = fy;
+          this.tweens.add({ targets: sg, x: tx + off * ny, y: ty + off * nx, duration: 380, delay: off * 3, ease: 'Linear', onComplete: () => sg.destroy() });
+        });
+        g.destroy();
+        break;
+      case 'arrow_jack':
+        g.lineStyle(2, 0xC8A000, 0.9); g.lineBetween(fx, fy, tx, ty);
+        g.fillStyle(0xCC2200, 0.9); g.fillTriangle(tx - nx * 8, ty - ny * 8, tx + ny * 4, ty - nx * 4, tx - ny * 4, ty + nx * 4);
+        this.tweens.add({ targets: g, alpha: 0, duration: 200, onComplete: () => g.destroy() });
+        break;
+      case 'shadow_rogue':
+        g.fillStyle(0x220022, 0.85);
+        g.fillCircle(0, 0, 12);
+        g.lineStyle(2, 0xAA0066, 0.7); g.strokeCircle(0, 0, 12);
+        g.x = tx; g.y = ty;
+        this.tweens.add({ targets: g, alpha: 0, scaleX: 2, scaleY: 2, duration: 280, onComplete: () => g.destroy() });
+        break;
+      case 'skywing':
+        g.fillStyle(0x222222, 0.9); g.fillCircle(0, 0, 10);
+        g.x = (fx + tx) / 2; g.y = Math.min(fy, ty) - 40;
+        this.tweens.add({ targets: g, x: tx, y: ty, duration: 500, ease: 'Quad.In', onComplete: () => { _ring(tx, ty, 0xFF6600, 35, 400); g.destroy(); } });
+        break;
+      case 'volt_ranger': {
+        const pts = [{ x: fx, y: fy }];
+        for (let i = 1; i < 5; i++) pts.push({ x: fx + dx * i / 5 + (Math.random() - 0.5) * 16, y: fy + dy * i / 5 + (Math.random() - 0.5) * 16 });
+        pts.push({ x: tx, y: ty });
+        g.lineStyle(3, 0xFFEE00, 0.9);
+        for (let i = 0; i < pts.length - 1; i++) g.lineBetween(pts[i].x, pts[i].y, pts[i + 1].x, pts[i + 1].y);
+        this.tweens.add({ targets: g, alpha: 0, duration: 160, onComplete: () => g.destroy() });
+        break;
+      }
+      case 'toxin_toad':
+        g.fillStyle(0x00AA22, 0.8); g.fillCircle(0, 0, 9);
+        g.x = fx; g.y = fy;
+        this.tweens.add({ targets: g, x: tx, y: ty, duration: 550, ease: 'Sine.Out', onComplete: () => { _pool(tx, ty, 0x00AA22, 28, 600); g.destroy(); } });
+        break;
+      case 'neon_wraith':
+        _ring(tx, ty, 0x00FFCC, 32, 380); break;
+      case 'forge_dwarf':
+        g.fillStyle(0x888888, 0.9); g.fillCircle(0, 0, 9);
+        g.x = fx; g.y = fy;
+        this.tweens.add({ targets: g, x: tx, y: ty, duration: 400, ease: 'Quad.In', onComplete: () => { _ring(tx, ty, 0xFF6600, 26, 320); g.destroy(); } });
+        break;
+      default:
+        g.destroy();
     }
   }
 
