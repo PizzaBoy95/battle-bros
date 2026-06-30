@@ -216,7 +216,7 @@ export class BattleScene extends Phaser.Scene {
           fontSize: '10px', fill: '#FFFFFF', fontFamily: 'Arial'
         }).setOrigin(0.5).setDepth(4);
 
-        this.towerObjects[playerKey][towerKey] = { g, hpBg, hpBar, hpText, pos, tw, th, isKing };
+        this.towerObjects[playerKey][towerKey] = { g, hpBg, hpBar, hpText, pos, tw, th, isKing, state: 'full' };
       }
     }
   }
@@ -541,23 +541,135 @@ export class BattleScene extends Phaser.Scene {
     const tw = tObj.tw;
     tObj.hpBar.setDisplaySize(tw * pct, 6);
     tObj.hpText.setText(String(Math.ceil(hp)));
-    if (hp <= 0 && tObj.g.visible) {
-      tObj.g.setAlpha(0.3);
-      this._playTowerDestroyFX(tObj.pos.x, tObj.pos.y);
+
+    const newState = hp <= 0 ? 'destroyed' : pct <= 0.5 ? 'damaged' : 'full';
+    if (newState !== tObj.state) {
+      tObj.state = newState;
+      this._redrawTower(playerKey, towerKey, newState);
+      if (newState === 'damaged') this._playTowerCrumble(tObj.pos, false);
+      if (newState === 'destroyed') this._playTowerDestroyFX(tObj.pos.x, tObj.pos.y);
     }
+  }
+
+  _redrawTower(playerKey, towerKey, state) {
+    const tObj = this.towerObjects?.[playerKey]?.[towerKey];
+    if (!tObj) return;
+    const { pos, tw, th, isKing } = tObj;
+    const isEnemy = playerKey !== this.myKey;
+    const g = tObj.g;
+    g.clear();
+
+    if (state === 'destroyed') {
+      // Rubble pile
+      g.fillStyle(0x000000, 0.35); g.fillEllipse(pos.x + 4, pos.y + 14, tw + 30, 16);
+      const rubbleCol = isEnemy ? 0x7A1E16 : 0x1A3A5A;
+      const rubbleDk  = isEnemy ? 0x4A0E0A : 0x0E2040;
+      g.fillStyle(rubbleDk); g.fillEllipse(pos.x, pos.y + 10, tw + 16, 18);
+      for (let i = 0; i < 6; i++) {
+        const rx = pos.x - tw * 0.4 + i * (tw * 0.16);
+        const ry = pos.y + 2 + (i % 2) * 8;
+        g.fillStyle(rubbleCol); g.fillRect(rx, ry, 10 + i * 2, 8);
+      }
+      g.fillStyle(rubbleDk, 0.6); g.fillRect(pos.x - 10, pos.y - 18, 20, 26);
+      g.fillStyle(0x444444, 0.4); g.fillEllipse(pos.x, pos.y + 6, tw * 0.6, 10);
+      return;
+    }
+
+    const SIDE = 9;
+    const sideCol = isEnemy ? 0x641A11 : 0x10304A;
+    const bodyCol = isEnemy ? 0xA93226 : 0x2471A3;
+    const merCol  = isEnemy ? 0x871E18 : 0x1A4A72;
+    const merSide = isEnemy ? 0x621610 : 0x123654;
+    const baseCol = isEnemy ? 0x5A1911 : 0x0E2A3D;
+
+    // Ground shadow
+    g.fillStyle(0x000000, 0.30); g.fillEllipse(pos.x + SIDE / 2, pos.y + 16, tw + 28, 14);
+    // Side depth
+    g.fillStyle(sideCol); g.fillRect(pos.x + tw / 2, pos.y - th + 10, SIDE, th + 6);
+    // Body
+    g.fillStyle(bodyCol); g.fillRect(pos.x - tw / 2, pos.y - th + 10, tw, th);
+    // Bricks
+    g.fillStyle(0x000000, 0.10);
+    for (let row = 0; row < Math.floor(th / 10); row++) {
+      const ry = pos.y - th + 10 + row * 10;
+      g.fillRect(pos.x - tw / 2, ry, tw, 1);
+      const offset = (row % 2) * 10;
+      for (let col = 0; col < 5; col++) g.fillRect(pos.x - tw / 2 + offset + col * 20, ry, 1, 10);
+    }
+    // Highlight
+    g.fillStyle(0xFFFFFF, 0.14); g.fillRect(pos.x - tw / 2, pos.y - th + 10, 3, th);
+
+    // Damage cracks (damaged state)
+    if (state === 'damaged') {
+      g.lineStyle(2, 0x000000, 0.55);
+      g.strokeRect(pos.x - tw / 2 + 8, pos.y - th + 14, 12, 22);
+      g.strokeRect(pos.x - tw / 2 + 24, pos.y - th + 30, 14, 18);
+      g.fillStyle(0x000000, 0.22); g.fillRect(pos.x - tw / 2 + 8, pos.y - th + 14, 12, 22);
+      // crumbled merlon gap — only draw 3 of 4 battlements
+    }
+
+    // Battlements (skip last if damaged)
+    const merlonCount = state === 'damaged' ? 3 : 4;
+    const slotW = Math.floor(tw / 4);
+    for (let i = 0; i < merlonCount; i++) {
+      const bx = pos.x - tw / 2 + i * slotW;
+      g.fillStyle(merCol);   g.fillRect(bx, pos.y - th, slotW - 4, 15);
+      g.fillStyle(merSide);  g.fillRect(bx + slotW - 4, pos.y - th, SIDE / 2 + 1, 15);
+      g.fillStyle(0xFFFFFF, 0.12); g.fillRect(bx, pos.y - th, 2, 15);
+    }
+    // Base
+    g.fillStyle(baseCol); g.fillRect(pos.x - tw / 2 - 5, pos.y + 8, tw + 10 + SIDE, 12);
+    // King crown
+    if (isKing) {
+      g.fillStyle(0xD4AC0D);
+      g.fillTriangle(pos.x - 13, pos.y - th - 2, pos.x, pos.y - th - 18, pos.x + 13, pos.y - th - 2);
+      g.fillStyle(0xFFD700);
+      g.fillTriangle(pos.x - 11, pos.y - th - 3, pos.x, pos.y - th - 15, pos.x + 11, pos.y - th - 3);
+    }
+    // Archer (hidden when damaged)
+    if (state !== 'damaged') {
+      const archerCol = isEnemy ? 0xFF7777 : 0x77CCFF;
+      g.fillStyle(archerCol, 0.85);
+      g.fillCircle(pos.x, pos.y - th - 5, 5);
+      g.fillRect(pos.x - 3, pos.y - th + 1, 6, 9);
+    }
+    // Damage smoke (start emitter for damaged state)
+    if (state === 'damaged') this._addTowerSmoke(pos);
+  }
+
+  _playTowerCrumble(pos, isDestroy) {
+    const fxG = this.add.graphics().setDepth(15);
+    fxG.fillStyle(0x888888, 0.8);
+    for (let i = 0; i < 6; i++) {
+      const rx = pos.x - 16 + i * 6;
+      fxG.fillRect(rx, pos.y - 20, 5, 10);
+    }
+    this.tweens.add({ targets: fxG, y: 40, alpha: 0, duration: 500, onComplete: () => fxG.destroy() });
+  }
+
+  _addTowerSmoke(pos) {
+    if (this._smokeTimers?.[`${pos.x},${pos.y}`]) return; // already smoking
+    if (!this._smokeTimers) this._smokeTimers = {};
+    const key = `${pos.x},${pos.y}`;
+    this._smokeTimers[key] = this.time.addEvent({ delay: 600, loop: true, callback: () => {
+      if (!this.scene.isActive()) return;
+      const sx = pos.x + (Math.random() - 0.5) * 20;
+      const sy = pos.y - 10;
+      const sG = this.add.graphics().setDepth(8).setAlpha(0.45);
+      sG.fillStyle(0x666666); sG.fillCircle(sx, sy, 4 + Math.random() * 4);
+      this.tweens.add({ targets: sG, y: '-=28', alpha: 0, duration: 900, onComplete: () => sG.destroy() });
+    }});
   }
 
   _playTowerDestroyFX(x, y) {
     const fxG = this.add.graphics().setDepth(15);
-    for (let i = 0; i < 12; i++) {
-      const angle = (i / 12) * Math.PI * 2;
-      const r = 20 + Math.random() * 30;
-      const ex = x + Math.cos(angle) * r;
-      const ey = y + Math.sin(angle) * r;
-      fxG.fillStyle(0xFF6600, 0.8);
-      fxG.fillCircle(ex, ey, 4 + Math.random() * 4);
+    for (let i = 0; i < 14; i++) {
+      const angle = (i / 14) * Math.PI * 2;
+      const r = 18 + Math.random() * 32;
+      fxG.fillStyle(0xFF6600, 0.8); fxG.fillCircle(x + Math.cos(angle) * r, y + Math.sin(angle) * r, 4 + Math.random() * 5);
+      fxG.fillStyle(0x888888, 0.6); fxG.fillCircle(x + Math.cos(angle) * r * 0.6, y + Math.sin(angle) * r * 0.6 - 10, 3 + Math.random() * 4);
     }
-    this.tweens.add({ targets: fxG, alpha: 0, scaleX: 2, scaleY: 2, duration: 600, onComplete: () => fxG.destroy() });
+    this.tweens.add({ targets: fxG, alpha: 0, scaleX: 2.2, scaleY: 2.2, duration: 700, onComplete: () => fxG.destroy() });
     audioSystem.playTowerDestroyed();
   }
 
