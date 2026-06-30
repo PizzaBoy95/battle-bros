@@ -227,28 +227,47 @@ export class BattleScene extends Phaser.Scene {
     // Elixir bar
     this.elixirSystem = new ElixirSystem(this, W / 2, H - 180, W - 100);
 
-    // Timer
-    this.battleTimer = new BattleTimer(this, W / 2, 30);
+    // ── Top HUD bar: [YOU 👑] [Timer] [👑 OPP] ──────────────────────────────
+    const BAR_H = 52;
+    const topBar = this.add.graphics().setDepth(9);
+    topBar.fillStyle(0x030310, 0.88);
+    topBar.fillRoundedRect(0, 0, W, BAR_H, { bl: 14, br: 14, tl: 0, tr: 0 });
+    topBar.lineStyle(1, 0x223366, 0.55);
+    topBar.strokeRoundedRect(0, 0, W, BAR_H, { bl: 14, br: 14, tl: 0, tr: 0 });
 
-    // Player label
-    const myLabel = this.myKey === 'p1' ? 'YOU (Bottom)' : 'YOU (Top)';
-    this.add.text(10, H - 200, myLabel, {
-      fontSize: '11px', fill: '#AAAACC', fontFamily: 'Arial'
-    }).setDepth(10);
+    // Timer centered in bar
+    this.battleTimer = new BattleTimer(this, W / 2, BAR_H / 2 + 2);
 
-    // Opponent
+    // Player name + crown — left side
     const opKey = this.myKey === 'p1' ? 'p2' : 'p1';
     const opInfo = this.matchInfo?.players?.find(p =>
       this.matchInfo?.teams?.[opKey]?.includes(p.userId)
     );
-    const opName = opInfo?.username || 'Opponent';
-    this.add.text(W - 10, 50, opName, {
-      fontSize: '11px', fill: '#FF6B6B', fontFamily: 'Arial'
-    }).setOrigin(1, 0).setDepth(10);
+    const myInfo = this.matchInfo?.players?.find(p =>
+      this.matchInfo?.teams?.[this.myKey]?.includes(p.userId)
+    );
+    const myName = (myInfo?.username || 'YOU').slice(0, 10);
+    const opName = (opInfo?.username || 'OPP').slice(0, 10);
 
-    // Crown counters
-    this.mycrownText  = this.add.text(10, H - 218, '👑 0', { fontSize: '14px', fill: '#FFD700', fontFamily: 'Arial' }).setDepth(10);
-    this.opCrownText  = this.add.text(W - 10, 64,  '👑 0', { fontSize: '14px', fill: '#FF6B6B', fontFamily: 'Arial' }).setOrigin(1, 0).setDepth(10);
+    // Left panel (you — blue)
+    const panelW = W / 2 - 68;
+    const leftPan = this.add.graphics().setDepth(10);
+    leftPan.fillStyle(0x1133AA, 0.22); leftPan.fillRoundedRect(4, 4, panelW - 4, BAR_H - 8, 8);
+    this.add.text(12, 8, myName, { fontSize: '10px', fill: '#8899FF', fontFamily: 'Arial', fontStyle: 'bold' }).setDepth(11);
+    this.mycrownText = this.add.text(12, 22, '👑 0', {
+      fontSize: '17px', fill: '#4488FF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+      stroke: '#001133', strokeThickness: 3
+    }).setDepth(11);
+
+    // Right panel (opponent — red)
+    const rightX = W / 2 + 68;
+    const rightPan = this.add.graphics().setDepth(10);
+    rightPan.fillStyle(0xAA1111, 0.22); rightPan.fillRoundedRect(rightX, 4, W - rightX - 4, BAR_H - 8, 8);
+    this.add.text(W - 12, 8, opName, { fontSize: '10px', fill: '#FF8888', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(1, 0).setDepth(11);
+    this.opCrownText = this.add.text(W - 12, 22, '0 👑', {
+      fontSize: '17px', fill: '#FF4444', fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+      stroke: '#330000', strokeThickness: 3
+    }).setOrigin(1, 0).setDepth(11);
 
     // Overtime banner (hidden)
     this.overtimeBanner = this.add.text(W / 2, H / 2, '⚡ OVERTIME ⚡', {
