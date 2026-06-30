@@ -20,8 +20,10 @@ export class BootScene extends Phaser.Scene {
     }
 
     // Hand-authored vector (SVG) character art → `<id>_art` textures
+    // Use load.image (HTMLImageElement) instead of load.svg (XHR) so data URIs
+    // never hang in browsers that block XHR against data: scheme URLs.
     for (const [id, svg] of Object.entries(CHAR_ART)) {
-      this.load.svg(id + '_art', 'data:image/svg+xml,' + encodeURIComponent(svg), { width: 240, height: 288 });
+      this.load.image(id + '_art', 'data:image/svg+xml,' + encodeURIComponent(svg));
     }
 
     // Suppress console errors for missing optional assets

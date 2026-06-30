@@ -13,7 +13,7 @@ const OUTLINE = '#211d39';
 const OW = 5;
 
 const wrap = (inner) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VB}">${inner}</svg>`;
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VB}" width="240" height="288">${inner}</svg>`;
 
 const shadow = () =>
   `<ellipse cx="100" cy="226" rx="50" ry="11" fill="#000" opacity="0.22"/>`;
