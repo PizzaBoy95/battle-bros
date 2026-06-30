@@ -6,11 +6,12 @@ import { audioSystem } from '../systems/AudioSystem.js';
 
 const DECK_SIZE = 7;
 const COLS      = 4;
-const CARD_W    = 90;
-const CARD_H    = 106;
+const CARD_W    = 104;   // larger cards (was 90)
+const CARD_H    = 122;   // larger cards (was 106)
 const CARD_PAD  = 8;
 const SLOT_W    = 48;
 const SLOT_H    = 46;
+const GRID_TOP  = 70;    // viewport top (just below header)
 
 export class CharSelectScene extends Phaser.Scene {
   constructor() { super('CharSelect'); }
@@ -103,12 +104,16 @@ export class CharSelectScene extends Phaser.Scene {
     this.cameras.main.fadeIn(280);
   }
 
-  // ── Card Grid ──────────────────────────────────────────────────────────────
+  // ── Card Grid (scrollable, masked viewport) ─────────────────────────────────
   _buildGrid() {
-    const { W } = this;
+    const { W, H } = this;
     const gridW  = COLS * (CARD_W + CARD_PAD) - CARD_PAD;
     const startX = (W - gridW) / 2 + CARD_W / 2;
-    const startY = 76;
+    const startY = GRID_TOP + CARD_H / 2 + 6;
+
+    // Scrollable container holds all card objects
+    this.gridContainer = this.add.container(0, 0).setDepth(1);
+    this.scrollY = 0;
 
     const ORDER = { legendary: 0, epic: 1, rare: 2, common: 3 };
     const sorted = [...CHARACTER_IDS].sort((a, b) =>
@@ -116,13 +121,16 @@ export class CharSelectScene extends Phaser.Scene {
     );
 
     this.cards = {};
+    let lastBottom = startY;
 
     sorted.forEach((charId, idx) => {
       const col = idx % COLS;
       const row = Math.floor(idx / COLS);
       const cx  = startX + col * (CARD_W + CARD_PAD);
       const cy  = startY + row * (CARD_H + CARD_PAD);
-      this._makeCard(charId, cx, cy);
+      const parts = this._makeCard(charId, cx, cy);
+      this.gridContainer.add(parts);
+      lastBottom = Math.max(lastBottom, cy + CARD_H / 2);
     });
 
     const offset = sorted.length;
@@ -130,7 +138,102 @@ export class CharSelectScene extends Phaser.Scene {
       const idx = offset + i;
       const cx  = startX + (idx % COLS) * (CARD_W + CARD_PAD);
       const cy  = startY + Math.floor(idx / COLS) * (CARD_H + CARD_PAD);
-      this._makeMysteryCard(cx, cy);
+      const parts = this._makeMysteryCard(cx, cy);
+      this.gridContainer.add(parts);
+      lastBottom = Math.max(lastBottom, cy + CARD_H / 2);
+    }
+
+    // Viewport mask between header and deck bar
+    this.gridBottom = H - 64 - SLOT_H / 2 - 12;   // just above deck bar strip
+    const maskShape = this.make.graphics({ x: 0, y: 0, add: false });
+    maskShape.fillStyle(0xffffff);
+    maskShape.fillRect(0, GRID_TOP, W, this.gridBottom - GRID_TOP);
+    this.gridContainer.setMask(maskShape.createGeometryMask());
+
+    // Scroll range
+    this.maxScroll = Math.max(0, (lastBottom + 8) - this.gridBottom);
+
+    this._setupScroll();
+  }
+
+  // ── Drag / wheel scrolling + tap-to-select hit testing ──────────────────────
+  _setupScroll() {
+    this._dragActive = false;
+    this._dragMoved  = 0;
+    this._lastPtrY   = 0;
+
+    // Scrollbar track + thumb (only meaningful if content overflows)
+    this.scrollbar = this.add.graphics().setDepth(8);
+    this._drawScrollbar();
+
+    // "scroll for more" hint fade at viewport bottom
+    if (this.maxScroll > 0) {
+      const hint = this.add.text(this.W / 2, this.gridBottom - 10, '▾ scroll for more ▾', {
+        fontSize: '9px', fill: '#5566AA', fontFamily: 'Arial', fontStyle: 'bold'
+      }).setOrigin(0.5).setDepth(8);
+      this.tweens.add({ targets: hint, alpha: 0.25, duration: 800, yoyo: true, repeat: -1 });
+      this._scrollHint = hint;
+    }
+
+    this.input.on('pointerdown', (p) => {
+      if (p.y < GRID_TOP || p.y > this.gridBottom) return; // outside viewport
+      this._dragActive = true;
+      this._dragMoved  = 0;
+      this._lastPtrY   = p.y;
+    });
+
+    this.input.on('pointermove', (p) => {
+      if (!this._dragActive || !p.isDown) return;
+      const dy = p.y - this._lastPtrY;
+      this._lastPtrY = p.y;
+      this._dragMoved += Math.abs(dy);
+      this._scrollBy(dy);
+    });
+
+    this.input.on('pointerup', (p) => {
+      if (!this._dragActive) return;
+      this._dragActive = false;
+      if (this._dragMoved < 10 && p.y >= GRID_TOP && p.y <= this.gridBottom) {
+        this._tapAt(p.x, p.y);   // it was a tap, not a scroll
+      }
+    });
+
+    // Mouse wheel
+    this.input.on('wheel', (_p, _o, _dx, dy) => this._scrollBy(-dy * 0.5));
+  }
+
+  _scrollBy(dy) {
+    this.scrollY = Phaser.Math.Clamp(this.scrollY + dy, -this.maxScroll, 0);
+    this.gridContainer.y = this.scrollY;
+    this._drawScrollbar();
+    if (this._scrollHint && this.scrollY < -8) {
+      this._scrollHint.setVisible(false);
+    }
+  }
+
+  _drawScrollbar() {
+    if (!this.scrollbar || this.maxScroll <= 0) return;
+    const { W } = this;
+    const viewH    = this.gridBottom - GRID_TOP;
+    const contentH = viewH + this.maxScroll;
+    const thumbH   = Math.max(28, viewH * (viewH / contentH));
+    const frac     = this.maxScroll ? (-this.scrollY / this.maxScroll) : 0;
+    const thumbY   = GRID_TOP + frac * (viewH - thumbH);
+    const x        = W - 6;
+
+    this.scrollbar.clear();
+    this.scrollbar.fillStyle(0x000000, 0.35); this.scrollbar.fillRoundedRect(x - 1, GRID_TOP, 4, viewH, 2);
+    this.scrollbar.fillStyle(0x4488CC, 0.85);  this.scrollbar.fillRoundedRect(x - 1, thumbY, 4, thumbH, 2);
+  }
+
+  _tapAt(px, py) {
+    const localY = py - this.gridContainer.y;
+    for (const [charId, card] of Object.entries(this.cards)) {
+      if (px >= card.cx - card.CW / 2 && px <= card.cx + card.CW / 2 &&
+          localY >= card.cy - card.CH / 2 && localY <= card.cy + card.CH / 2) {
+        this._toggleCard(charId);
+        return;
+      }
     }
   }
 
@@ -169,7 +272,7 @@ export class CharSelectScene extends Phaser.Scene {
       portrait.x = cx; portrait.y = portraitCY;
       const fn = DRAW_FUNCS[charId];
       if (fn) fn(portrait);
-      portrait.setScale(0.62);
+      portrait.setScale(0.72);
     }
 
     // ── Dark name plate — bottom 30% overlay ───────────────────────────────
@@ -235,24 +338,15 @@ export class CharSelectScene extends Phaser.Scene {
 
     const banShine = topShine; // alias so destroy loop still works
 
-    // ── Interaction ─────────────────────────────────────────────────────────
-    const zone = this.add.zone(cx, cy, CARD_W, CARD_H).setInteractive({ useHandCursor: true }).setDepth(6);
-    zone.on('pointerdown', () => this._toggleCard(charId));
-    const cardParts = [bg, grad1, grad2, border, plateBg, portrait, name, sel];
-    zone.on('pointerover', () => {
-      this.tweens.add({ targets: cardParts, scaleX: 1.08, scaleY: 1.08, duration: 90, ease: 'Power1' });
-      this._showInfo(charId);
-      this._runShimmer(cx, cy, CW, CH);
-    });
-    zone.on('pointerout', () => {
-      this.tweens.add({ targets: cardParts, scaleX: 1, scaleY: 1, duration: 90, ease: 'Power1' });
-    });
-
     this.cards[charId] = {
       cx, cy, CW, CH, rc,
       bg, grad1, grad2, border, portrait, plateBg, banShine, rarLbl, name,
-      ribG, ribLbl, eg, eLbl, lvG, lvLbl, sel, selOverlay, zone, charId
+      ribG, ribLbl, eg, eLbl, lvG, lvLbl, sel, selOverlay, charId
     };
+
+    // Return every display object in render order so the grid container can hold them
+    return [bg, grad1, grad2, topShine, border, portrait, plateBg,
+            ribG, ribLbl, rarLbl, name, eg, eLbl, lvG, lvLbl, sel, selOverlay];
   }
 
   _drawCardBorder(g, cx, cy, CW, CH, rc, isSel) {
@@ -287,8 +381,8 @@ export class CharSelectScene extends Phaser.Scene {
     const lx = cx - CW / 2, ly = cy - CH / 2;
 
     // Dark card
-    this.add.rectangle(cx, cy, CW, CH, 0x07070f);
-    this.add.rectangle(cx, ly + CH * 0.2, CW, CH * 0.4, 0x3344AA, 0.06);
+    const r1 = this.add.rectangle(cx, cy, CW, CH, 0x07070f);
+    const r2 = this.add.rectangle(cx, ly + CH * 0.2, CW, CH * 0.4, 0x3344AA, 0.06);
 
     const g = this.add.graphics();
     g.lineStyle(1.5, 0x1e1e44, 0.8); g.strokeRect(lx, ly, CW, CH);
@@ -307,8 +401,10 @@ export class CharSelectScene extends Phaser.Scene {
     dot.fillStyle(0x6677FF, 0.5); dot.fillCircle(cx, cy - 26, 4);
     this.tweens.add({ targets: dot, alpha: 0.12, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
-    this.add.text(cx, cy + 26, '???',    { fontSize: '14px', fill: '#1e1e44', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(0.5);
-    this.add.text(cx, cy + 40, 'LOCKED', { fontSize: '7px',  fill: '#14142a', fontFamily: 'Arial' }).setOrigin(0.5);
+    const t1 = this.add.text(cx, cy + 26, '???',    { fontSize: '14px', fill: '#1e1e44', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(0.5);
+    const t2 = this.add.text(cx, cy + 40, 'LOCKED', { fontSize: '7px',  fill: '#14142a', fontFamily: 'Arial' }).setOrigin(0.5);
+
+    return [r1, r2, g, dot, t1, t2];
   }
 
   // ── Deck bar ───────────────────────────────────────────────────────────────

@@ -95,7 +95,11 @@ function updateUnits(units, towers, dt) {
         closestEnemy.hp -= dmg;
         unit.damageDealt = (unit.damageDealt || 0) + dmg;
 
-        events.push({ type: 'unit_hit', targetId: closestEnemy.id, damage: dmg, x: closestEnemy.x, y: closestEnemy.y });
+        events.push({
+          type: 'unit_hit', targetId: closestEnemy.id, damage: dmg,
+          x: closestEnemy.x, y: closestEnemy.y,
+          charId: unit.charId, fromX: unit.x, fromY: unit.y
+        });
 
         if (closestEnemy.hp <= 0) {
           closestEnemy.hp = 0;
@@ -132,7 +136,8 @@ function updateUnits(units, towers, dt) {
           hp: towers[enemyKey][closestTower.key].hp,
           damage,
           x: closestTower.x,
-          y: closestTower.y
+          y: closestTower.y,
+          charId: unit.charId, fromX: unit.x, fromY: unit.y
         });
 
         if (towers[enemyKey][closestTower.key].hp <= 0) {
@@ -206,7 +211,11 @@ function updateUnits(units, towers, dt) {
         tower.attackCooldown = cooldown;
         tgt.hp -= towerStats.damage;
 
-        events.push({ type: 'tower_attack', from: playerKey, fromTower: towerType, targetId: tgt.id, damage: towerStats.damage });
+        events.push({
+          type: 'tower_attack', from: playerKey, fromTower: towerType, targetId: tgt.id,
+          damage: towerStats.damage,
+          fromX: towerStats.pos.x, fromY: towerStats.pos.y, x: tgt.x, y: tgt.y
+        });
 
         if (tgt.hp <= 0) {
           tgt.hp = 0;

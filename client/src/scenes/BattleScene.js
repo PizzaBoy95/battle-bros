@@ -727,35 +727,25 @@ export class BattleScene extends Phaser.Scene {
     // Remove dead units
     for (const [id, uObj] of Object.entries(this.unitGraphics)) {
       if (!serverIds.has(id)) {
-        this._playDeathFX(uObj.x, uObj.y);
+        this._playDeathFX(uObj.dispX, uObj.dispY);
         uObj.g.destroy();
         uObj.tintG?.destroy();
+        uObj.shadowG?.destroy();
+        uObj.legG?.destroy();
         uObj.hpBg.destroy();
         uObj.hpBar.destroy();
         delete this.unitGraphics[id];
       }
     }
 
-    // Update or create units
+    // Update or create units — store TARGET position; animation handled in update()
     for (const u of serverUnits) {
       if (this.unitGraphics[u.id]) {
         const uObj = this.unitGraphics[u.id];
-        const { height: H } = this.scale;
-        const depthSc = this._unitDepthScale(u.y);
-        const barW    = 36 * depthSc;
-
-        uObj.g.setPosition(u.x, u.y).setScale(1.0 * depthSc);
-        uObj.tintG.setPosition(u.x, u.y);
-        uObj.tintG.clear();
-        uObj.tintG.lineStyle(3, u.owner === this.myKey ? 0x44AAFF : 0xFF4444, 1);
-        uObj.tintG.strokeCircle(0, 24, 18 * depthSc);
-
-        uObj.hpBg.setPosition(u.x, u.y - 32 * depthSc).setDisplaySize(barW + 4, 6);
-        uObj.hpBar.setPosition(u.x, u.y - 32 * depthSc).setDisplaySize(barW * Math.max(0, u.hp / u.maxHp), 4);
-        uObj.hpBar.setFillStyle(u.owner === this.myKey ? 0x27AE60 : 0xE74C3C);
-        uObj.x = u.x; uObj.y = u.y;
+        uObj.tx = u.x; uObj.ty = u.y;
+        uObj.hp = u.hp; uObj.maxHp = u.maxHp;
+        uObj.state = u.state;
       } else {
-        // Create new unit
         this._createUnitGraphic(u);
       }
     }
@@ -768,34 +758,164 @@ export class BattleScene extends Phaser.Scene {
   }
 
   _createUnitGraphic(u) {
-    const { height: H } = this.scale;
-    const depthSc = this._unitDepthScale(u.y);
-    const BASE_SCALE = 1.0;
+    const char    = CHARACTERS[u.charId] || {};
+    const isAir   = char.type === 'air';
+    const isMe    = u.owner === this.myKey;
 
+    // Dynamic ground shadow + team ring (behind everything)
+    const shadowG = this.add.graphics().setDepth(3);
+    // Animated legs (ground units only, behind body)
+    const legG    = isAir ? null : this.add.graphics().setDepth(4);
+    // Team ring at feet
+    const tintG   = this.add.graphics().setDepth(4).setAlpha(0.75);
+
+    // Body
     const g = this.add.graphics().setDepth(5);
-    g.x = u.x; g.y = u.y;
-
     const drawFn = DRAW_FUNCS[u.charId];
     if (drawFn) drawFn(g);
-    else {
-      g.fillStyle(0x888888);
-      g.fillCircle(0, 0, 18);
+    else { g.fillStyle(0x888888); g.fillCircle(0, 0, 18); }
+
+    // HP bar
+    const hpBg  = this.add.rectangle(u.x, u.y, 40, 6, 0x111111).setDepth(6);
+    const hpBar = this.add.rectangle(u.x, u.y, 36, 4, isMe ? 0x27AE60 : 0xE74C3C).setDepth(7).setOrigin(0.5);
+
+    this.unitGraphics[u.id] = {
+      g, tintG, shadowG, legG, hpBg, hpBar,
+      charId: u.charId, char, isAir, isMe,
+      color: char.color ?? 0x888888, accent: char.accentColor ?? 0xCCCCCC,
+      tx: u.x, ty: u.y, dispX: u.x, dispY: u.y,
+      hp: u.hp, maxHp: u.maxHp, state: u.state,
+      phase: Math.random() * Math.PI * 2,   // walk/hover cycle offset
+      walkT: Math.random() * 10,            // accumulated cycle time
+      lungeX: 0, lungeY: 0,                 // attack lunge offset (decays)
+      kbX: 0, kbY: 0,                       // knockback offset (decays)
+      facing: isMe ? -1 : 1                 // -1 = up the board, 1 = down
+    };
+  }
+
+  // ── Per-frame animation: walking bounce, hover, legs, lunge, knockback ──────
+  update(time, delta) {
+    if (!this.unitGraphics) return;
+    const { height: H } = this.scale;
+    const dt = Math.min(delta, 50);
+
+    for (const id in this.unitGraphics) {
+      const o = this.unitGraphics[id];
+
+      // Smoothly chase the server target position
+      const lerp = 0.22;
+      const prevX = o.dispX, prevY = o.dispY;
+      o.dispX += (o.tx - o.dispX) * lerp;
+      o.dispY += (o.ty - o.dispY) * lerp;
+
+      // Movement speed → drives walk cadence & whether we bounce
+      const moved = Math.hypot(o.dispX - prevX, o.dispY - prevY);
+      const movingByState = o.state === 'moving';
+      const isMoving = movingByState || moved > 0.25;
+
+      // Advance the animation cycle (faster when moving)
+      const cadence = o.isAir ? 0.004 : (isMoving ? 0.011 : 0.005);
+      o.walkT += dt * cadence;
+      const ph = o.walkT + o.phase;
+
+      const depthSc = this._unitDepthScale(o.dispY);
+
+      // Decay lunge & knockback
+      o.lungeX *= 0.80; o.lungeY *= 0.80;
+      o.kbX    *= 0.84; o.kbY    *= 0.84;
+
+      // ── Vertical motion ──────────────────────────────────────────────────
+      let bob, sqStretch;
+      if (o.isAir) {
+        bob = Math.sin(ph * 1.6) * 5;          // gentle hover
+        sqStretch = 1 + Math.sin(ph * 1.6) * 0.03;
+      } else if (isMoving) {
+        bob = -Math.abs(Math.sin(ph)) * 6;     // walking bounce (up)
+        sqStretch = 1 - (bob / 6) * 0.07;      // squash on footfall
+      } else {
+        bob = Math.sin(ph) * 1.5;              // idle breath
+        sqStretch = 1 + Math.sin(ph) * 0.02;
+      }
+
+      const bx = o.dispX + o.lungeX + o.kbX;
+      const by = o.dispY + o.lungeY + o.kbY;
+
+      // ── Dynamic shadow (shrinks as unit rises) ───────────────────────────
+      const lift = Math.abs(bob);
+      const shScale = 1 - lift / 26;
+      o.shadowG.clear();
+      o.shadowG.fillStyle(0x000000, 0.28 * shScale);
+      o.shadowG.fillEllipse(o.dispX, o.dispY + 24 * depthSc, 30 * depthSc * shScale, 9 * depthSc * shScale);
+
+      // ── Team ring at feet ────────────────────────────────────────────────
+      o.tintG.clear();
+      o.tintG.lineStyle(2.5, o.isMe ? 0x44AAFF : 0xFF4444, 0.9);
+      o.tintG.strokeEllipse(o.dispX, o.dispY + 24 * depthSc, 34 * depthSc, 12 * depthSc);
+
+      // ── Animated legs (ground only) ──────────────────────────────────────
+      if (o.legG) {
+        o.legG.clear();
+        const hipX = bx, hipY = by + bob + 16 * depthSc;
+        const legLen = 11 * depthSc;
+        const swing  = (isMoving ? Math.sin(ph) : 0) * 6 * depthSc;
+        o.legG.lineStyle(5 * depthSc, this._darken(o.color, 0.6), 1);
+        // Back leg
+        o.legG.lineBetween(hipX - 4 * depthSc, hipY, hipX - 4 * depthSc - swing, hipY + legLen);
+        // Front leg
+        o.legG.lineBetween(hipX + 4 * depthSc, hipY, hipX + 4 * depthSc + swing, hipY + legLen);
+        // Tiny feet
+        o.legG.fillStyle(this._darken(o.color, 0.45), 1);
+        o.legG.fillCircle(hipX - 4 * depthSc - swing, hipY + legLen, 2.6 * depthSc);
+        o.legG.fillCircle(hipX + 4 * depthSc + swing, hipY + legLen, 2.6 * depthSc);
+      }
+
+      // ── Body transform ───────────────────────────────────────────────────
+      const lean = (isMoving && !o.isAir ? Math.sin(ph * 0.5) * 0.045 : Math.sin(ph) * 0.02);
+      o.g.setPosition(bx, by + bob);
+      o.g.setScale(depthSc, depthSc * sqStretch);
+      o.g.setRotation(lean);
+
+      // ── HP bar ───────────────────────────────────────────────────────────
+      const barW = 36 * depthSc;
+      const barY = by + bob - 34 * depthSc;
+      o.hpBg.setPosition(o.dispX, barY).setDisplaySize(barW + 4, 6);
+      o.hpBar.setPosition(o.dispX - barW / 2, barY).setDisplaySize(barW * Math.max(0, o.hp / o.maxHp), 4).setOrigin(0, 0.5);
     }
-    g.setScale(BASE_SCALE * depthSc);
+  }
 
-    // Team color ring (clean, not a heavy tint blob)
-    const isMe = u.owner === this.myKey;
-    const tintG = this.add.graphics().setDepth(4).setAlpha(0.70);
-    tintG.x = u.x; tintG.y = u.y;
-    tintG.lineStyle(3, isMe ? 0x44AAFF : 0xFF4444, 1);
-    tintG.strokeCircle(0, 24, 18 * depthSc);
+  _darken(hex, f) {
+    const r = ((hex >> 16) & 0xff) * f, g = ((hex >> 8) & 0xff) * f, b = (hex & 0xff) * f;
+    return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
+  }
 
-    // HP bar (above unit, not below — looks more modern)
-    const barW = 36 * depthSc;
-    const hpBg  = this.add.rectangle(u.x, u.y - 32 * depthSc, barW + 4, 6, 0x111111).setDepth(6);
-    const hpBar = this.add.rectangle(u.x, u.y - 32 * depthSc, barW,     4, isMe ? 0x27AE60 : 0xE74C3C).setDepth(7).setOrigin(0.5);
+  // Attacker leans toward its target, then springs back (lunge decays in update)
+  _lungeUnit(charId, fx, fy, tx, ty) {
+    let best = null, bestD = 40 * 40;
+    for (const id in this.unitGraphics) {
+      const o = this.unitGraphics[id];
+      if (o.charId !== charId) continue;
+      const d = (o.dispX - fx) ** 2 + (o.dispY - fy) ** 2;
+      if (d < bestD) { bestD = d; best = o; }
+    }
+    if (!best) return;
+    const dx = tx - fx, dy = ty - fy;
+    const d = Math.hypot(dx, dy) || 1;
+    best.lungeX = (dx / d) * 8;
+    best.lungeY = (dy / d) * 8;
+  }
 
-    this.unitGraphics[u.id] = { g, tintG, hpBg, hpBar, x: u.x, y: u.y };
+  // Target gets shoved away from the attacker (knockback decays in update)
+  _knockbackTarget(targetId, fx, fy, tx, ty, dmg) {
+    const o = this.unitGraphics[targetId];
+    if (!o) return; // towers aren't in unitGraphics — they don't get knocked back
+    const dx = tx - fx, dy = ty - fy;
+    const d = Math.hypot(dx, dy) || 1;
+    const mag = Math.min(4 + (dmg || 0) / 30, 12);
+    o.kbX = (dx / d) * mag;
+    o.kbY = (dy / d) * mag;
+    // Quick white hit-flash on the body
+    o.g.setAlpha(0.6);
+    this.tweens.add({ targets: o.g, alpha: 1, duration: 140 });
   }
 
   _playDeathFX(x, y) {
@@ -821,15 +941,75 @@ export class BattleScene extends Phaser.Scene {
 
   _onGameEvent(evt) {
     if (evt.type === 'unit_hit' || evt.type === 'tower_hit') {
-      this._showDamageNumber(evt.x, evt.y, evt.damage);
-      if (evt.charId) this._playAttackFX(evt.charId, evt.fromX ?? evt.x, evt.fromY ?? evt.y, evt.x, evt.y);
-      audioSystem.playHit();
+      const fx = evt.fromX ?? evt.x, fy = evt.fromY ?? evt.y;
+      const char = CHARACTERS[evt.charId];
+      const range = char?.range ?? 80;
+      const accent = char?.accentColor ?? char?.color ?? 0xFFFFFF;
+
+      // Fire the attacker's projectile / slash
+      if (evt.charId) {
+        this._playAttackFX(evt.charId, fx, fy, evt.x, evt.y);
+        // Attacker lunges toward the target
+        this._lungeUnit(evt.charId, fx, fy, evt.x, evt.y);
+      }
+
+      // Compute how long the projectile takes to reach the target (ranged only)
+      const dist = Math.hypot(evt.x - fx, evt.y - fy);
+      const travel = range >= 130 ? Math.min(dist * 1.0, 380) : 0;
+
+      // Impact spark + damage number land together, AFTER the projectile arrives
+      this.time.delayedCall(travel, () => {
+        this._impactFlash(evt.x, evt.y, accent);
+        this._showDamageNumber(evt.x, evt.y, evt.damage);
+        this._knockbackTarget(evt.targetId, fx, fy, evt.x, evt.y, evt.damage);
+        audioSystem.playHit();
+      });
     }
     if (evt.type === 'tower_destroyed') { audioSystem.playTowerDestroyed(); }
     if (evt.type === 'tower_attack') {
-      if (evt.charId) this._playAttackFX(evt.charId, evt.fromX ?? evt.x, evt.fromY ?? evt.y, evt.toX ?? evt.x, evt.toY ?? evt.y);
-      audioSystem.playTowerHit();
+      const fx = evt.fromX ?? evt.x, fy = evt.fromY ?? evt.y;
+      const col = evt.from === this.myKey ? 0x44AAFF : 0xFF4444;
+      this._towerBolt(fx, fy, evt.x, evt.y, col);
+      const dist = Math.hypot(evt.x - fx, evt.y - fy);
+      this.time.delayedCall(Math.min(dist * 0.9, 300), () => {
+        this._impactFlash(evt.x, evt.y, col);
+        this._showDamageNumber(evt.x, evt.y, evt.damage);
+        this._knockbackTarget(evt.targetId, fx, fy, evt.x, evt.y, evt.damage);
+        audioSystem.playTowerHit();
+      });
     }
+  }
+
+  // ── Impact spark burst at the point of contact ─────────────────────────────
+  _impactFlash(x, y, col) {
+    // Bright flash core
+    const flash = this.add.graphics().setDepth(16);
+    flash.fillStyle(0xFFFFFF, 0.9); flash.fillCircle(x, y, 8);
+    flash.fillStyle(col, 0.6); flash.fillCircle(x, y, 13);
+    this.tweens.add({ targets: flash, scaleX: 1.8, scaleY: 1.8, alpha: 0, duration: 200, onComplete: () => flash.destroy() });
+    // Radiating spark lines
+    const sparks = this.add.graphics().setDepth(16);
+    sparks.lineStyle(2, col, 0.95);
+    for (let i = 0; i < 6; i++) {
+      const a = (i / 6) * Math.PI * 2 + Math.random() * 0.4;
+      const len = 9 + Math.random() * 9;
+      sparks.lineBetween(x, y, x + Math.cos(a) * len, y + Math.sin(a) * len);
+    }
+    this.tweens.add({ targets: sparks, scaleX: 1.7, scaleY: 1.7, alpha: 0, duration: 240, onComplete: () => sparks.destroy() });
+  }
+
+  // ── Tower projectile bolt ──────────────────────────────────────────────────
+  _towerBolt(fx, fy, tx, ty, col) {
+    const g = this.add.graphics().setDepth(14);
+    g.fillStyle(col, 0.95); g.fillCircle(0, 0, 6);
+    g.fillStyle(0xFFFFFF, 0.7); g.fillCircle(0, 0, 3);
+    g.x = fx; g.y = fy;
+    const dist = Math.hypot(tx - fx, ty - fy);
+    this.tweens.add({
+      targets: g, x: tx, y: ty,
+      duration: Math.min(dist * 0.9, 300), ease: 'Linear',
+      onComplete: () => g.destroy()
+    });
   }
 
   _playAttackFX(charId, fx, fy, tx, ty) {
