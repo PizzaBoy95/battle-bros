@@ -3,29 +3,47 @@
 export class BattleTimer {
   constructor(scene, x, y) {
     this.scene = scene;
-    this.x = x;
-    this.y = y;
+    this.x = x; this.y = y;
     this.timerMs = 180000;
     this.overtime = false;
     this.suddenDeath = false;
-
     this._build();
   }
 
   _build() {
     const s = this.scene;
 
-    this.bg = s.add.rectangle(this.x, this.y, 110, 38, 0x0a0a1a, 0.85)
-      .setOrigin(0.5).setDepth(10);
+    // Oval/pill background
+    this.bgG = s.add.graphics().setDepth(10);
+    this._drawBg(0x0a0a1a, 0x1a1a3a);
 
-    this.text = s.add.text(this.x, this.y, '3:00', {
+    this.text = s.add.text(this.x, this.y - 2, '3:00', {
       fontSize: '26px', fill: '#FFFFFF',
-      fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+      fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+      stroke: '#000000', strokeThickness: 3
     }).setOrigin(0.5).setDepth(11);
 
-    this.phaseLabel = s.add.text(this.x, this.y + 24, '', {
-      fontSize: '11px', fill: '#FFD700', fontFamily: 'Arial', fontStyle: 'bold'
+    this.phaseLabel = s.add.text(this.x, this.y + 22, '', {
+      fontSize: '10px', fill: '#FFD700',
+      fontFamily: 'Arial', fontStyle: 'bold',
+      stroke: '#332200', strokeThickness: 2
     }).setOrigin(0.5).setDepth(11);
+  }
+
+  _drawBg(fill, border) {
+    this.bgG.clear();
+    // Outer glow ring
+    this.bgG.lineStyle(6, border, 0.22);
+    this.bgG.strokeEllipse(this.x, this.y, 128, 52);
+    // Main oval pill
+    this.bgG.fillStyle(fill, 0.90);
+    this.bgG.fillEllipse(this.x, this.y, 120, 44);
+    // Border ring
+    this.bgG.lineStyle(1.5, border, 0.80);
+    this.bgG.strokeEllipse(this.x, this.y, 120, 44);
+    // Inner top shine
+    this.bgG.fillStyle(0xFFFFFF, 0.06);
+    this.bgG.fillEllipse(this.x - 4, this.y - 8, 72, 14);
   }
 
   update(timerMs, overtime, suddenDeath) {
@@ -36,23 +54,21 @@ export class BattleTimer {
     const totalSec = Math.ceil(timerMs / 1000);
     const min = Math.floor(totalSec / 60);
     const sec = totalSec % 60;
-    const timeStr = `${min}:${sec.toString().padStart(2, '0')}`;
-
-    this.text.setText(timeStr);
+    this.text.setText(`${min}:${sec.toString().padStart(2, '0')}`);
 
     if (suddenDeath) {
-      this.text.setStyle({ fill: '#FF0000' });
-      this.phaseLabel.setText('SUDDEN DEATH');
-      this.phaseLabel.setStyle({ fill: '#FF4444' });
+      this._drawBg(0x1a0000, 0xFF2222);
+      this.text.setStyle({ fill: '#FF4444' });
+      this.phaseLabel.setText('SUDDEN DEATH').setStyle({ fill: '#FF4444' });
     } else if (overtime) {
+      this._drawBg(0x1a1400, 0xFFD700);
       this.text.setStyle({ fill: '#FFD700' });
-      this.phaseLabel.setText('OVERTIME');
-      this.phaseLabel.setStyle({ fill: '#FFD700' });
-      // Pulse
-      this.scene.tweens.add({ targets: this.text, scaleX: 1.1, scaleY: 1.1, duration: 200, yoyo: true });
+      this.phaseLabel.setText('OVERTIME').setStyle({ fill: '#FFD700' });
+      this.scene.tweens.add({ targets: this.text, scaleX: 1.08, scaleY: 1.08, duration: 180, yoyo: true });
     } else {
-      const color = totalSec <= 30 ? '#FF6B6B' : '#FFFFFF';
-      this.text.setStyle({ fill: color });
+      const low = totalSec <= 30;
+      this._drawBg(0x0a0a1a, low ? 0xFF4444 : 0x2a2a5a);
+      this.text.setStyle({ fill: low ? '#FF6B6B' : '#FFFFFF' });
       this.phaseLabel.setText('');
     }
   }
@@ -65,7 +81,7 @@ export class BattleTimer {
   }
 
   destroy() {
-    this.bg.destroy();
+    this.bgG.destroy();
     this.text.destroy();
     this.phaseLabel.destroy();
   }
