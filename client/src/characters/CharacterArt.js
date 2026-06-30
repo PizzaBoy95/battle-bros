@@ -12,8 +12,18 @@ const VB = '0 0 200 240';
 const OUTLINE = '#211d39';
 const OW = 5;
 
+// Each character group gets a silhouette-accurate soft drop shadow (feDropShadow
+// uses the alpha channel, so the cast shadow exactly matches the figure). This
+// lifts the character off the card for a more rendered, 3-D feel.
 const wrap = (inner) =>
-  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VB}" width="240" height="288">${inner}</svg>`;
+  `<svg xmlns="http://www.w3.org/2000/svg" viewBox="${VB}" width="240" height="288">
+  <defs>
+    <filter id="ds" x="-35%" y="-35%" width="170%" height="170%">
+      <feDropShadow dx="0" dy="5" stdDeviation="4.5" flood-color="#05030f" flood-opacity="0.42"/>
+    </filter>
+  </defs>
+  <g filter="url(#ds)">${inner}</g>
+</svg>`;
 
 const shadow = () =>
   `<ellipse cx="100" cy="226" rx="50" ry="11" fill="#000" opacity="0.22"/>`;

@@ -60,6 +60,7 @@ export class BattleScene extends Phaser.Scene {
     this.selectedCardIdx = 0;
     this.myElixir = 5;
     this.overtime = false;
+    this.elixirRate = 1;
     this.currentUnits = [];
     this.gameOver = false;
   }
@@ -278,20 +279,33 @@ export class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5).setAlpha(0).setDepth(20);
   }
 
+  // Player may deploy anywhere in their own half — from just past the river
+  // (the enemy bridge line) down to in front of their king tower.
+  _deployBounds() {
+    return this.myKey === 'p1'
+      ? { minY: 450, maxY: 720 }
+      : { minY: 134, maxY: 404 };
+  }
+
   _buildDeployZone() {
-    const { width: W, height: H } = this.scale;
-    this._deployZoneG = this.add.graphics().setDepth(1).setAlpha(0.10);
+    const { width: W } = this.scale;
+    const b = this._deployBounds();
+    const h = b.maxY - b.minY;
+    this._deployZoneG = this.add.graphics().setDepth(1).setAlpha(0);
     this._deployZoneG.fillStyle(0x00FF88);
-    if (this.myKey === 'p1') {
-      this._deployZoneG.fillRect(62, 596, W - 124, 220);
-    } else {
-      this._deployZoneG.fillRect(62, 38, W - 124, 220);
+    this._deployZoneG.fillRect(62, b.minY, W - 124, h);
+    // Dashed boundary line at the river edge (the limit of your half)
+    this._deployEdgeG = this.add.graphics().setDepth(2).setAlpha(0.5);
+    const edgeY = this.myKey === 'p1' ? b.minY : b.maxY;
+    this._deployEdgeG.lineStyle(2, 0x00FFAA, 0.5);
+    for (let x = 64; x < W - 64; x += 22) {
+      this._deployEdgeG.lineBetween(x, edgeY, x + 12, edgeY);
     }
     // Zone label
-    const zy = this.myKey === 'p1' ? 620 : 58;
+    const zy = this.myKey === 'p1' ? b.minY + 16 : b.maxY - 16;
     this.add.text(W / 2, zy, 'YOUR TERRITORY', {
-      fontSize: '9px', fill: '#00FF88', fontFamily: 'Arial', alpha: 0.4, letterSpacing: 3
-    }).setOrigin(0.5).setDepth(2).setAlpha(0.35);
+      fontSize: '9px', fill: '#00FF88', fontFamily: 'Arial', letterSpacing: 3
+    }).setOrigin(0.5).setDepth(2).setAlpha(0.4);
   }
 
   _buildHandCards() {
@@ -506,7 +520,7 @@ export class BattleScene extends Phaser.Scene {
         audioSystem.playDeploy();
         this._buildDeployIndicator(ptr.x, ptr.y);
         this.myElixir = Math.max(0, this.myElixir - char.elixirCost);
-        this.elixirSystem.update(this.myElixir, this.overtime);
+        this.elixirSystem.update(this.myElixir, this.elixirRate || 1);
       } else if (char) {
         this._showNotEnoughElixir();
       }
@@ -519,13 +533,12 @@ export class BattleScene extends Phaser.Scene {
     this._dragCardIdx = -1;
     this._ghostG?.destroy();
     this._ghostG = null;
-    this._deployZoneG?.setAlpha(0.10);
+    this._deployZoneG?.setAlpha(0);
   }
 
   _inMyDeployZone(x, y) {
-    return this.myKey === 'p1'
-      ? (y >= 596 && y <= 820)
-      : (y >= 38  && y <= 258);
+    const b = this._deployBounds();
+    return x >= 56 && x <= this.scale.width - 56 && y >= b.minY && y <= b.maxY;
   }
 
   // Fallback: tap on map directly while card selected (no drag)
@@ -546,7 +559,7 @@ export class BattleScene extends Phaser.Scene {
     audioSystem.playDeploy();
     this._buildDeployIndicator(ptr.x, ptr.y);
     this.myElixir = Math.max(0, this.myElixir - char.elixirCost);
-    this.elixirSystem.update(this.myElixir, this.overtime);
+    this.elixirSystem.update(this.myElixir, this.elixirRate || 1);
   }
 
   _showNotEnoughElixir() {
@@ -562,11 +575,12 @@ export class BattleScene extends Phaser.Scene {
     this.battleTimer.update(data.timerMs, data.overtime, data.suddenDeath);
 
     // Update my elixir from server
+    this.elixirRate = data.elixirRate || 1;
     if (data.elixir) {
       const uid = this.myUserId;
       if (data.elixir[uid] !== undefined) {
         this.myElixir = data.elixir[uid];
-        this.elixirSystem.update(this.myElixir, data.overtime);
+        this.elixirSystem.update(this.myElixir, this.elixirRate);
       }
     }
 

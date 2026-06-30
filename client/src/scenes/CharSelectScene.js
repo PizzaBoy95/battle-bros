@@ -76,10 +76,20 @@ export class CharSelectScene extends Phaser.Scene {
       fontSize: '12px', fill: '#8899CC', fontFamily: 'Arial'
     }).setOrigin(0.5).setDepth(2);
 
-    this.add.text(28, 22, '← BACK', {
-      fontSize: '12px', fill: '#556688', fontFamily: 'Arial'
-    }).setOrigin(0.5).setDepth(2).setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.scene.start('MainMenu'));
+    // Prominent BACK button (drawn pill, easy tap target)
+    const backG = this.add.graphics().setDepth(2);
+    const bx = 10, by = 10, bw = 74, bh = 30;
+    backG.fillStyle(0x14142e, 0.95); backG.fillRoundedRect(bx, by, bw, bh, 8);
+    backG.lineStyle(1.5, 0x3a5a9a, 0.9); backG.strokeRoundedRect(bx, by, bw, bh, 8);
+    backG.fillStyle(0xFFFFFF, 0.06); backG.fillRoundedRect(bx + 2, by + 2, bw - 4, bh * 0.45, 6);
+    const backTxt = this.add.text(bx + bw / 2, by + bh / 2, '← BACK', {
+      fontSize: '13px', fill: '#AFC4F0', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+    }).setOrigin(0.5).setDepth(3);
+    const backZone = this.add.zone(bx + bw / 2, by + bh / 2, bw + 12, bh + 12)
+      .setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(4);
+    backZone.on('pointerover', () => backTxt.setColor('#FFFFFF'));
+    backZone.on('pointerout',  () => backTxt.setColor('#AFC4F0'));
+    backZone.on('pointerdown', () => { audioSystem.playClick(); this.scene.start('MainMenu'); });
 
     // ── Card grid ──────────────────────────────────────────────────────────
     this._buildGrid();
@@ -233,7 +243,14 @@ export class CharSelectScene extends Phaser.Scene {
     for (const [charId, card] of Object.entries(this.cards)) {
       if (px >= card.cx - card.CW / 2 && px <= card.cx + card.CW / 2 &&
           localY >= card.cy - card.CH / 2 && localY <= card.cy + card.CH / 2) {
-        this._showInfo(charId);   // open detail modal (stats + add/remove)
+        // Tap the ⓘ button → open stats modal; tap anywhere else → toggle deck
+        const dx = px - card.infoCx, dy = localY - card.infoCy;
+        if (dx * dx + dy * dy <= card.infoR * card.infoR) {
+          this._showInfo(charId);
+        } else {
+          this._toggleCard(charId);                 // one-click add / remove
+          this._runShimmer(card.cx, card.cy + this.gridContainer.y, card.CW, card.CH);
+        }
         return;
       }
     }
@@ -253,16 +270,27 @@ export class CharSelectScene extends Phaser.Scene {
     // Rarity-tinted top gradient wash
     const grad1 = this.add.rectangle(cx, ly + CH * 0.28, CW, CH * 0.56, rc, 0.18);
     const grad2 = this.add.rectangle(cx, ly + CH * 0.10, CW, CH * 0.22, rc, 0.10);
-    // Left-edge shine (lighting illusion)
-    const topShine = this.add.rectangle(lx + 2, cy, 3, CH - 2, 0xFFFFFF, 0.07);
+    // Top sheen — bright light from above (3-D card lighting)
+    const topShine = this.add.rectangle(cx, ly + 9, CW - 6, 16, 0xFFFFFF, 0.10);
 
-    // ── 4px rarity border ──────────────────────────────────────────────────
+    const PORTRAIT_H = CH * 0.68;
+    const portraitCY = ly + PORTRAIT_H / 2;
+
+    // ── Pedestal / stage under the character ────────────────────────────────
+    // Rarity-tinted glow disc + dark contact shadow grounds the figure so it
+    // reads as standing on a lit podium rather than floating on a flat card.
+    const feetY = ly + PORTRAIT_H - 8;
+    const pedestal = this.add.graphics().setDepth(1);
+    pedestal.fillStyle(rc, 0.10);        pedestal.fillEllipse(cx, feetY, CW * 0.86, 26);
+    pedestal.fillStyle(rc, 0.22);        pedestal.fillEllipse(cx, feetY, CW * 0.62, 17);
+    pedestal.fillStyle(0x000000, 0.34);  pedestal.fillEllipse(cx, feetY + 4, CW * 0.46, 9);
+    pedestal.fillStyle(0xFFFFFF, 0.10);  pedestal.fillEllipse(cx, feetY - 2, CW * 0.42, 6);
+
+    // ── 4px rarity border (with bevel) ──────────────────────────────────────
     const border = this.add.graphics();
     this._drawCardBorder(border, cx, cy, CW, CH, rc, isSel);
 
     // ── Character portrait — top 68% of card ───────────────────────────────
-    const PORTRAIT_H = CH * 0.68;
-    const portraitCY = ly + PORTRAIT_H / 2;
     const texKey = cardTexKey(this, charId);
     let portrait;
     if (texKey) {
@@ -331,10 +359,19 @@ export class CharSelectScene extends Phaser.Scene {
       fill: `#${rc.toString(16).padStart(6, '0')}`
     }).setOrigin(0.5).setDepth(5);
 
+    // ── Info button (ⓘ) — bottom-left of portrait, opens stats modal ─────────
+    const ibX = lx + 13, ibY = ly + PORTRAIT_H - 12;
+    const infoG = this.add.graphics().setDepth(4);
+    infoG.fillStyle(0x05050f, 0.85); infoG.fillCircle(ibX, ibY, 11);
+    infoG.lineStyle(2, 0x66AAFF, 0.95); infoG.strokeCircle(ibX, ibY, 11);
+    const infoLbl = this.add.text(ibX, ibY + 0.5, 'i', {
+      fontSize: '13px', fill: '#9CCBFF', fontFamily: 'Georgia, serif', fontStyle: 'bold italic'
+    }).setOrigin(0.5).setDepth(5);
+
     // ── Selected checkmark overlay ──────────────────────────────────────────
     const sel = this.add.text(cx, portraitCY, isSel ? '✓' : '', {
-      fontSize: '28px', fill: '#FFD700', fontFamily: 'Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 4
+      fontSize: '34px', fill: '#3CE07A', fontFamily: 'Arial', fontStyle: 'bold',
+      stroke: '#04200E', strokeThickness: 5
     }).setOrigin(0.5).setDepth(5);
     // Selected gold overlay tint
     const selOverlay = this.add.rectangle(cx, cy, CW, CH, 0xFFD700, isSel ? 0.08 : 0).setDepth(2);
@@ -342,14 +379,14 @@ export class CharSelectScene extends Phaser.Scene {
     const banShine = topShine; // alias so destroy loop still works
 
     this.cards[charId] = {
-      cx, cy, CW, CH, rc,
-      bg, grad1, grad2, border, portrait, plateBg, banShine, rarLbl, name,
-      ribG, ribLbl, eg, eLbl, lvG, lvLbl, sel, selOverlay, charId
+      cx, cy, CW, CH, rc, infoCx: ibX, infoCy: ibY, infoR: 15,
+      bg, grad1, grad2, pedestal, border, portrait, plateBg, banShine, rarLbl, name,
+      ribG, ribLbl, eg, eLbl, lvG, lvLbl, infoG, infoLbl, sel, selOverlay, charId
     };
 
     // Return every display object in render order so the grid container can hold them
-    return [bg, grad1, grad2, topShine, border, portrait, plateBg,
-            ribG, ribLbl, rarLbl, name, eg, eLbl, lvG, lvLbl, sel, selOverlay];
+    return [bg, grad1, grad2, topShine, pedestal, border, portrait, plateBg,
+            ribG, ribLbl, rarLbl, name, eg, eLbl, lvG, lvLbl, infoG, infoLbl, sel, selOverlay];
   }
 
   _drawCardBorder(g, cx, cy, CW, CH, rc, isSel) {
@@ -361,14 +398,17 @@ export class CharSelectScene extends Phaser.Scene {
       g.lineStyle(6, 0xFFD700, 0.30);  g.strokeRect(lx - 2, ly - 2, CW + 4, CH + 4);
       // Main gold border
       g.lineStyle(4, 0xFFD700, 1.0);   g.strokeRect(lx, ly, CW, CH);
-      // Inner 1px dark shadow line
       g.lineStyle(1, 0x000000, 0.5);   g.strokeRect(lx + 2, ly + 2, CW - 4, CH - 4);
     } else {
       // 4px rarity border
       g.lineStyle(4, rc, 0.85);        g.strokeRect(lx, ly, CW, CH);
-      // Inner 1px shadow
       g.lineStyle(1, 0x000000, 0.45);  g.strokeRect(lx + 2, ly + 2, CW - 4, CH - 4);
     }
+    // Bevel — bright top/left edge + dark bottom/right edge = raised 3-D card
+    g.lineStyle(2, 0xFFFFFF, 0.16);
+    g.beginPath(); g.moveTo(lx + 3, ly + CH - 5); g.lineTo(lx + 3, ly + 3); g.lineTo(lx + CW - 4, ly + 3); g.strokePath();
+    g.lineStyle(2, 0x000000, 0.30);
+    g.beginPath(); g.moveTo(lx + CW - 3, ly + 4); g.lineTo(lx + CW - 3, ly + CH - 3); g.lineTo(lx + 4, ly + CH - 3); g.strokePath();
   }
 
   _runShimmer(cx, cy, CW, CH) {
@@ -542,14 +582,20 @@ export class CharSelectScene extends Phaser.Scene {
       this._showInfo(this._infoCharId); // refresh button state
     });
 
-    // Close X
-    const closeBtn = this.add.text(PW / 2 - 16, -PH / 2 + 14, '✕', {
-      fontSize: '18px', fill: '#8888AA', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
-    closeBtn.on('pointerdown', () => this._closeInfo());
+    // Close X — large circular button, generous hit area
+    const cxX = PW / 2 - 22, cxY = -PH / 2 + 22;
+    const closeG = this.add.graphics();
+    closeG.fillStyle(0x3a1020, 0.95); closeG.fillCircle(cxX, cxY, 16);
+    closeG.lineStyle(2, 0xFF6677, 0.9); closeG.strokeCircle(cxX, cxY, 16);
+    const closeBtn = this.add.text(cxX, cxY, '✕', {
+      fontSize: '18px', fill: '#FFAABB', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+    }).setOrigin(0.5);
+    const closeZone = this.add.zone(cxX, cxY, 44, 44).setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+    closeZone.on('pointerdown', () => this._closeInfo());
 
     this.infoPanel.add([this.infoName, this.infoRar, this.infoType, this.infoBars,
-                        this.infoSpec, this.infoBtnBg, this.infoBtnTxt, closeBtn]);
+                        this.infoSpec, this.infoBtnBg, this.infoBtnTxt, closeG, closeBtn, closeZone]);
     this._PW = PW; this._PH = PH;
   }
 

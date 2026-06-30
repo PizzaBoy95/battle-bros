@@ -53,8 +53,11 @@ const LANES = {
   right: { minX: 260, maxX: 460 }
 };
 
-// Deploy zone: player deploys in bottom 30% of map (y 596–816)
-const DEPLOY_ZONE = { minY: 596, maxY: 816 };
+// Deploy zone: player may deploy anywhere in their OWN HALF, from just past the
+// river (the enemy bridge line) down to in front of their king. River center is
+// at GAME_HEIGHT*0.48 ≈ 410 (river band 410–448), so p1 starts at y=450.
+// (p2 is mirrored on the server: deployY ∈ [854-maxY, 854-minY] = [134, 404].)
+const DEPLOY_ZONE = { minY: 450, maxY: 720 };
 
 const CHARACTERS = {
   titan_grunt: {

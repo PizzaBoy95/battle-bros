@@ -39,6 +39,7 @@ class GameRoom {
     this.timerMs = BATTLE_TIMER.standard * 1000;
     this.overtime = false;
     this.suddenDeath = false;
+    this.elixirRate = 1;
     this.phase = 'waiting'; // waiting | battle | overtime | ended
 
     // 2v2: teams { team1: [userId, userId], team2: [userId, userId] }
@@ -188,8 +189,16 @@ class GameRoom {
       return;
     }
 
-    // Elixir regen
-    const regenMs = this.overtime ? ELIXIR.overtimeRegenMs : ELIXIR.regenMs;
+    // Elixir regen — tiered speed:
+    //   1x for the first minute (timer 3:00 → 2:00)
+    //   2x once 2:00 remains (timer 2:00 → 1:00)
+    //   3x in the final minute (timer ≤ 1:00) and through overtime / sudden death
+    let rate = 1;
+    if (this.overtime || this.suddenDeath) rate = 3;
+    else if (this.timerMs <= 60000)  rate = 3;
+    else if (this.timerMs <= 120000) rate = 2;
+    this.elixirRate = rate;
+    const regenMs = ELIXIR.regenMs / rate;
     for (const p of this.players) {
       this.elixirAccum[p.userId] = (this.elixirAccum[p.userId] || 0) + dt;
       if (this.elixirAccum[p.userId] >= regenMs) {
@@ -239,6 +248,7 @@ class GameRoom {
           }
         },
         elixir: elixirMap,
+        elixirRate: this.elixirRate || 1,
         timerMs: Math.max(0, this.timerMs),
         overtime: this.overtime,
         suddenDeath: this.suddenDeath
