@@ -758,174 +758,222 @@ export function generatePortraitTextures(scene) {
   }
 }
 
-// ── Battle unit draw functions (40×60 for in-game units) ─────────────────────
+// ── Battle unit draw functions (84×84 canvas, origin at center) ──────────────
 export const DRAW_FUNCS = {
   titan_grunt(g) {
-    g.fillStyle(0x3E2208); g.fillRect(-21,-27,42,51);
-    g.fillStyle(0x6B3A12); g.fillRect(-20,-28,40,50);
-    g.fillStyle(0x8A5020,0.5); g.fillRect(-20,-28,10,50);
-    g.fillStyle(0x808080); g.fillRect(-26,-30,48,14);
-    g.fillStyle(0xC8C8C8); g.fillRect(-24,-32,44,10);
-    g.fillStyle(0x555555); g.fillCircle(0,-38,15);
-    g.fillStyle(0x909090); g.fillCircle(0,-38,13);
-    g.fillStyle(0xFF4400,0.8); g.fillRect(-8,-38,16,4);
-    g.fillStyle(0xC8A000); g.fillRect(-24,-12,6,28);
-    g.fillStyle(0xC8C8C8); g.fillTriangle(-28,-14,-16,-14,-22,-28);
-    g.fillStyle(0x444444); g.fillRect(11,-28,18,36);
-    g.fillStyle(0xFFD700); g.fillCircle(20,-10,5);
-    g.fillStyle(0xFFD700,0.7); g.fillRect(-20,12,40,4);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0x444444); g.fillCircle(0,-40,17); g.strokeCircle(0,-40,17);
+    g.fillStyle(0xFF4400,0.9); g.fillRect(-9,-41,18,5); g.strokeRect(-9,-41,18,5);
+    g.fillStyle(0xC8C8C8); g.fillRect(-26,-32,52,16); g.strokeRect(-26,-32,52,16);
+    g.fillStyle(0x6B3A12); g.fillRect(-22,-26,44,52); g.strokeRect(-22,-26,44,52);
+    g.fillStyle(0x8A5020,0.45); g.fillRect(-22,-26,12,52);
+    g.fillStyle(0xFFD700,0.8); g.fillRect(-22,10,44,5);
+    g.fillStyle(0xC8A000); g.fillRect(-26,-14,7,30); g.strokeRect(-26,-14,7,30);
+    g.fillStyle(0x888888); g.fillTriangle(-30,-16,-16,-16,-23,-32); g.strokeTriangle(-30,-16,-16,-16,-23,-32);
+    g.fillStyle(0x444444); g.fillRect(14,-26,20,38); g.strokeRect(14,-26,20,38);
+    g.fillStyle(0xFFD700); g.fillCircle(24,-8,6); g.strokeCircle(24,-8,6);
   },
   pyro_drake(g) {
-    g.fillStyle(0xFF4500); g.fillEllipse(0,-10,30,44);
-    g.fillStyle(0xFF8C00); g.fillCircle(0,-36,12);
-    g.fillStyle(0xCC2200); g.fillTriangle(-14,-20,-40,-40,-14,0); g.fillTriangle(14,-20,40,-40,14,0);
-    g.fillStyle(0xFFD700); g.fillEllipse(0,-42,6,10);
-    g.fillStyle(0xFF6600); g.fillRect(-4,18,8,16);
-    g.fillStyle(0xFFCC00,0.8); g.fillEllipse(-16,-36,14,6);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0xCC2200); g.fillTriangle(-16,-22,-44,-44,-14,2); g.strokeTriangle(-16,-22,-44,-44,-14,2);
+    g.fillTriangle(16,-22,44,-44,14,2); g.strokeTriangle(16,-22,44,-44,14,2);
+    g.fillStyle(0xFF4500); g.fillEllipse(0,-8,32,48); g.strokeEllipse(0,-8,32,48);
+    g.fillStyle(0xFF8C00); g.fillCircle(0,-36,14); g.strokeCircle(0,-36,14);
+    g.fillStyle(0xFFCC00,0.9); g.fillEllipse(-14,-38,16,6);
+    g.fillStyle(0xFFAA00); g.fillRect(-5,20,10,18); g.strokeRect(-5,20,10,18);
   },
   lady_vex(g) {
-    g.fillStyle(0x9B59B6); g.fillEllipse(0,-12,22,40);
-    g.fillStyle(0xFAD7A0); g.fillCircle(0,-36,10);
-    g.fillStyle(0x8E44AD); g.fillTriangle(-12,-44,12,-44,0,-28);
-    g.fillStyle(0xFAD7A0); g.fillRect(-20,-28,4,18);
-    g.fillStyle(0xE91E8C); g.fillRect(-22,-36,4,4);
-    g.fillStyle(0xFFD700); g.fillRect(14,-42,4,50); g.fillCircle(16,-44,8);
-    g.fillStyle(0xE91E8C); g.fillCircle(16,-44,5);
-    g.fillStyle(0xAA44FF,0.6); g.fillCircle(-30,-18,4); g.fillCircle(28,-30,3);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0x9B59B6); g.fillEllipse(0,-10,24,42); g.strokeEllipse(0,-10,24,42);
+    g.fillStyle(0x8E44AD); g.fillTriangle(-14,-44,14,-44,0,-28); g.strokeTriangle(-14,-44,14,-44,0,-28);
+    g.fillStyle(0xFAD7A0); g.fillRect(-22,-26,5,20); g.strokeRect(-22,-26,5,20);
+    g.fillStyle(0xE91E8C); g.fillRect(-24,-36,5,5);
+    g.fillStyle(0xFFD700); g.fillRect(15,-44,5,52); g.fillCircle(17,-46,9); g.strokeCircle(17,-46,9);
+    g.fillStyle(0xE91E8C); g.fillCircle(17,-46,6);
+    g.fillStyle(0xAA44FF,0.7); g.fillCircle(-32,-20,5); g.fillCircle(30,-30,4);
+    g.fillStyle(0xFAD7A0); g.fillCircle(0,-36,12); g.strokeCircle(0,-36,12);
   },
   bone_shard(g) {
-    g.fillStyle(0x1A1A2E); g.fillEllipse(0,-10,28,46);
-    g.fillStyle(0x2C3E50); g.fillTriangle(-14,-30,14,-30,0,-50);
-    g.fillStyle(0xF0E68C); g.fillCircle(0,-36,7);
-    g.fillStyle(0x1A1A2E); g.fillRect(-3,-38,2,4); g.fillRect(1,-38,2,4);
-    g.fillStyle(0x8E44AD); g.fillCircle(-20,-10,5); g.fillCircle(20,-10,5); g.fillCircle(0,14,6);
-    g.fillStyle(0x6C3483); g.fillRect(-2,-26,4,50);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0x1A1A2E); g.fillEllipse(0,-8,30,48); g.strokeEllipse(0,-8,30,48);
+    g.fillStyle(0x2C3E50); g.fillTriangle(-16,-30,16,-30,0,-52); g.strokeTriangle(-16,-30,16,-30,0,-52);
+    g.fillStyle(0xF0E68C); g.fillCircle(0,-36,9); g.strokeCircle(0,-36,9);
+    g.fillStyle(0x8E44AD,0.9); g.fillCircle(-22,-12,6); g.strokeCircle(-22,-12,6);
+    g.fillCircle(22,-12,6); g.strokeCircle(22,-12,6);
+    g.fillCircle(0,16,7); g.strokeCircle(0,16,7);
+    g.fillStyle(0x6C3483); g.fillRect(-3,-24,6,52);
   },
   iron_bro(g) {
-    g.fillStyle(0x1F618D); g.fillRect(-16,-28,32,50);
-    g.fillStyle(0x2E86C1); g.fillCircle(0,-38,12);
-    g.fillStyle(0x85C1E9); g.fillRect(-6,-44,12,6);
-    g.fillStyle(0x7F8C8D); g.fillRect(12,-32,18,36);
-    g.fillStyle(0xFFD700); g.fillCircle(21,-14,4);
-    g.fillStyle(0xC0C0C0); g.fillRect(-20,-26,6,30);
-    g.fillStyle(0xFFD700); g.fillRect(-24,-22,14,4);
-    g.fillStyle(0x2266FF,0.4); g.fillRect(-16,-28,32,50);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0xC0C0C0); g.fillRect(-22,-28,7,32); g.strokeRect(-22,-28,7,32);
+    g.fillStyle(0xFFD700); g.fillRect(-26,-24,16,5); g.strokeRect(-26,-24,16,5);
+    g.fillStyle(0x1F618D); g.fillRect(-16,-28,34,52); g.strokeRect(-16,-28,34,52);
+    g.fillStyle(0x2266FF,0.35); g.fillRect(-16,-28,34,52);
+    g.fillStyle(0x7F8C8D); g.fillRect(12,-32,20,38); g.strokeRect(12,-32,20,38);
+    g.fillStyle(0xFFD700); g.fillCircle(22,-14,5); g.strokeCircle(22,-14,5);
+    g.fillStyle(0x2E86C1); g.fillCircle(0,-38,14); g.strokeCircle(0,-38,14);
+    g.fillStyle(0x85C1E9); g.fillRect(-7,-44,14,7); g.strokeRect(-7,-44,14,7);
   },
   stone_golem(g) {
-    g.fillStyle(0x3A4040); g.fillRect(-35,-22,12,34); g.fillRect(23,-22,12,34);
-    g.fillStyle(0x5A6465); g.fillRect(-34,-22,12,34); g.fillRect(22,-22,12,34);
-    g.fillStyle(0x5A6465); g.fillRect(-22,-28,44,56);
-    g.fillStyle(0xFF4400,0.8); g.fillRect(-18,-16,36,2); g.fillRect(-18,-4,36,2);
-    g.fillStyle(0x5A6465); g.fillCircle(0,-38,18);
-    g.fillStyle(0xFF8800); g.fillCircle(-5.5,-37,3.5); g.fillCircle(5.5,-37,3.5);
-    g.fillStyle(0xFFCC00,0.6); g.fillCircle(-5.5,-37,1.5); g.fillCircle(5.5,-37,1.5);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0x3A4040); g.fillRect(-38,-24,13,36); g.strokeRect(-38,-24,13,36);
+    g.fillRect(25,-24,13,36); g.strokeRect(25,-24,13,36);
+    g.fillStyle(0x5A6465); g.fillRect(-24,-30,48,58); g.strokeRect(-24,-30,48,58);
+    g.fillStyle(0xFF4400,0.7); g.fillRect(-18,-18,36,3); g.fillRect(-18,-6,36,3);
+    g.fillStyle(0x5A6465); g.fillCircle(0,-40,20); g.strokeCircle(0,-40,20);
+    g.fillStyle(0xFF8800); g.fillCircle(-7,-39,5); g.strokeCircle(-7,-39,5);
+    g.fillCircle(7,-39,5); g.strokeCircle(7,-39,5);
+    g.fillStyle(0xFFCC00); g.fillCircle(-7,-39,2); g.fillCircle(7,-39,2);
   },
   thunder_chief(g) {
-    g.fillStyle(0xA04000); g.fillRect(-14,-28,28,46);
-    g.fillStyle(0xE67E22); g.fillCircle(0,-38,12);
-    g.fillStyle(0xC0392B); g.fillRect(-14,-40,28,8);
-    g.fillStyle(0x7D6608); g.fillRect(-28,-30,10,32); g.fillTriangle(-30,-30,-18,-28,-28,-44);
-    g.fillRect(18,-30,10,32); g.fillTriangle(20,-30,32,-28,22,-44);
-    g.fillStyle(0xFFEE00,0.8); g.fillCircle(-22,0,4); g.fillCircle(22,0,4);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0x7D6608); g.fillRect(-30,-32,11,34); g.strokeRect(-30,-32,11,34);
+    g.fillTriangle(-32,-32,-18,-30,-30,-48); g.strokeTriangle(-32,-32,-18,-30,-30,-48);
+    g.fillRect(19,-32,11,34); g.strokeRect(19,-32,11,34);
+    g.fillTriangle(18,-32,32,-30,22,-48); g.strokeTriangle(18,-32,32,-30,22,-48);
+    g.fillStyle(0xFFEE00,0.9); g.fillCircle(-24,2,5); g.fillCircle(24,2,5);
+    g.fillStyle(0xA04000); g.fillRect(-15,-28,30,48); g.strokeRect(-15,-28,30,48);
+    g.fillStyle(0xC0392B); g.fillRect(-15,-40,30,9); g.strokeRect(-15,-40,30,9);
+    g.fillStyle(0xE67E22); g.fillCircle(0,-40,14); g.strokeCircle(0,-40,14);
   },
   blaze_witch(g) {
-    g.fillStyle(0x1A1A1A); g.fillEllipse(0,-6,22,40);
-    g.fillStyle(0xFF6B00); g.fillTriangle(-12,-28,12,-28,0,-56);
-    g.fillStyle(0xFAD7A0); g.fillCircle(0,-34,9);
-    g.fillStyle(0xFF4500); g.fillCircle(-16,-2,6); g.fillCircle(16,-2,6);
-    g.fillStyle(0xFF8C00,0.7); g.fillCircle(0,18,8); g.fillCircle(0,24,5);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0xFF4500); g.fillCircle(-18,-4,7); g.strokeCircle(-18,-4,7);
+    g.fillCircle(18,-4,7); g.strokeCircle(18,-4,7);
+    g.fillStyle(0xFF8C00,0.8); g.fillCircle(0,20,9); g.fillCircle(0,26,6);
+    g.fillStyle(0x1A1A1A); g.fillEllipse(0,-4,24,42); g.strokeEllipse(0,-4,24,42);
+    g.fillStyle(0xFF6B00); g.fillTriangle(-14,-28,14,-28,0,-58); g.strokeTriangle(-14,-28,14,-28,0,-58);
+    g.fillStyle(0xFAD7A0); g.fillCircle(0,-34,11); g.strokeCircle(0,-34,11);
+    g.fillStyle(0xFF4400,0.9); g.fillCircle(-4,-34,3); g.fillCircle(4,-34,3);
   },
   wing_knight(g) {
-    g.fillStyle(0xBDC3C7); g.fillRect(-14,-26,28,44);
-    g.fillStyle(0xECF0F1); g.fillCircle(0,-36,12);
-    g.fillStyle(0x2C3E50); g.fillRect(-6,-42,12,6);
-    g.fillStyle(0xF0F4F8); g.fillTriangle(-16,-22,-44,-44,-12,8); g.fillTriangle(16,-22,44,-44,12,8);
-    g.fillStyle(0xFFD700); g.fillRect(-4,-32,8,44);
-    g.fillStyle(0xAABBFF,0.5); g.fillRect(-14,-26,28,44);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0xF0F4F8); g.fillTriangle(-18,-22,-46,-46,-12,10); g.strokeTriangle(-18,-22,-46,-46,-12,10);
+    g.fillTriangle(18,-22,46,-46,12,10); g.strokeTriangle(18,-22,46,-46,12,10);
+    g.fillStyle(0xBDC3C7); g.fillRect(-16,-28,32,46); g.strokeRect(-16,-28,32,46);
+    g.fillStyle(0xAABBFF,0.45); g.fillRect(-16,-28,32,46);
+    g.fillStyle(0xFFD700); g.fillRect(-5,-34,10,46); g.strokeRect(-5,-34,10,46);
+    g.fillStyle(0xECF0F1); g.fillCircle(0,-38,14); g.strokeCircle(0,-38,14);
+    g.fillStyle(0x2C3E50); g.fillRect(-7,-44,14,7); g.strokeRect(-7,-44,14,7);
   },
   frostborn(g) {
-    g.fillStyle(0x1A5276); g.fillEllipse(0,-8,26,44);
-    g.fillStyle(0xD6EAF8); g.fillCircle(0,-36,11);
-    g.fillStyle(0x2E86C1); g.fillTriangle(-12,-44,-6,-50,0,-44); g.fillTriangle(0,-44,6,-50,12,-44);
-    g.fillStyle(0xADD8E6); g.fillCircle(-20,-10,7); g.fillCircle(20,-10,7);
-    g.fillStyle(0x85C1E9,0.6); g.fillRect(-2,-22,4,40); g.fillCircle(0,-24,9);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0xADD8E6); g.fillCircle(-22,-12,8); g.strokeCircle(-22,-12,8);
+    g.fillCircle(22,-12,8); g.strokeCircle(22,-12,8);
+    g.fillStyle(0x1A5276); g.fillEllipse(0,-6,28,46); g.strokeEllipse(0,-6,28,46);
+    g.fillStyle(0x85C1E9,0.6); g.fillRect(-3,-24,6,42); g.fillCircle(0,-26,10); g.strokeCircle(0,-26,10);
+    g.fillStyle(0xD6EAF8); g.fillCircle(0,-38,13); g.strokeCircle(0,-38,13);
+    g.fillStyle(0x2E86C1); g.fillTriangle(-13,-46,-7,-52,0,-46); g.strokeTriangle(-13,-46,-7,-52,0,-46);
+    g.fillTriangle(0,-46,7,-52,13,-46); g.strokeTriangle(0,-46,7,-52,13,-46);
   },
   jade_monk(g) {
-    g.fillStyle(0x1E8449); g.fillEllipse(0,-8,24,44);
-    g.fillStyle(0xFAD7A0); g.fillCircle(0,-36,10);
-    g.fillStyle(0x239B56); g.fillRect(-12,-24,24,8);
-    g.fillStyle(0x8B4513); g.fillRect(-20,-42,4,56);
-    g.fillStyle(0x2ECC71); g.fillCircle(-18,-44,6); g.fillCircle(10,-10,5);
-    g.fillStyle(0x00FF88,0.5); g.fillCircle(20,-24,3); g.fillCircle(24,-14,3);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0x8B4513); g.fillRect(-22,-44,5,58); g.strokeRect(-22,-44,5,58);
+    g.fillStyle(0x2ECC71); g.fillCircle(-19,-46,7); g.strokeCircle(-19,-46,7);
+    g.fillStyle(0x1E8449); g.fillEllipse(0,-6,26,46); g.strokeEllipse(0,-6,26,46);
+    g.fillStyle(0x239B56); g.fillRect(-13,-22,26,9); g.strokeRect(-13,-22,26,9);
+    g.fillStyle(0x2ECC71); g.fillCircle(12,-10,6); g.strokeCircle(12,-10,6);
+    g.fillStyle(0x00FF88,0.6); g.fillCircle(22,-26,4); g.fillCircle(26,-14,3);
+    g.fillStyle(0xFAD7A0); g.fillCircle(0,-38,12); g.strokeCircle(0,-38,12);
   },
   sea_crusher(g) {
-    g.fillStyle(0x0E6655); g.fillRect(-16,-26,32,50);
-    g.fillStyle(0x16A085); g.fillCircle(0,-36,13);
-    g.fillStyle(0x1ABC9C); g.fillRect(-6,-40,12,8);
-    g.fillStyle(0x0B5345); g.fillRect(16,-22,20,14); g.fillCircle(36,-15,7);
-    g.fillStyle(0x1ABC9C); g.fillCircle(36,-15,4);
-    g.fillStyle(0x85C1E9,0.8); g.fillCircle(40,-18,3); g.fillCircle(44,-14,2);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0x0B5345); g.fillRect(-24,-26,12,50); g.strokeRect(-24,-26,12,50);
+    g.fillStyle(0x0E6655); g.fillRect(-14,-28,34,54); g.strokeRect(-14,-28,34,54);
+    g.fillStyle(0x0B5345); g.fillRect(18,-24,22,16); g.strokeRect(18,-24,22,16);
+    g.fillStyle(0x16A085); g.fillCircle(40,-16,8); g.strokeCircle(40,-16,8);
+    g.fillStyle(0x1ABC9C); g.fillCircle(40,-16,5);
+    g.fillStyle(0x85C1E9,0.9); g.fillCircle(44,-18,3); g.fillCircle(48,-14,2);
+    g.fillStyle(0x16A085); g.fillCircle(0,-38,15); g.strokeCircle(0,-38,15);
+    g.fillStyle(0x1ABC9C); g.fillRect(-7,-42,14,9); g.strokeRect(-7,-42,14,9);
   },
   crystal_sage(g) {
-    g.fillStyle(0x6C3483); g.fillEllipse(0,-8,24,42);
-    g.fillStyle(0xD7BDE2); g.fillCircle(0,-36,10);
-    g.fillStyle(0xA29BFE); g.fillTriangle(-10,-44,-4,-56,2,-44); g.fillTriangle(2,-44,8,-54,14,-44);
-    g.fillStyle(0xFD79A8); g.fillTriangle(-24,-20,-18,-30,-12,-20); g.fillTriangle(12,-18,18,-28,24,-18);
-    g.fillStyle(0xCC44FF,0.4); g.fillRect(-14,-22,28,40);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0xFD79A8); g.fillTriangle(-26,-22,-20,-34,-14,-22); g.strokeTriangle(-26,-22,-20,-34,-14,-22);
+    g.fillTriangle(14,-20,20,-30,26,-20); g.strokeTriangle(14,-20,20,-30,26,-20);
+    g.fillStyle(0xA29BFE); g.fillTriangle(-12,-44,-4,-58,2,-44); g.strokeTriangle(-12,-44,-4,-58,2,-44);
+    g.fillTriangle(2,-44,9,-56,16,-44); g.strokeTriangle(2,-44,9,-56,16,-44);
+    g.fillStyle(0x6C3483); g.fillEllipse(0,-6,26,44); g.strokeEllipse(0,-6,26,44);
+    g.fillStyle(0xCC44FF,0.4); g.fillRect(-16,-22,32,42);
+    g.fillStyle(0xD7BDE2); g.fillCircle(0,-36,12); g.strokeCircle(0,-36,12);
   },
   arrow_jack(g) {
-    g.fillStyle(0x4A7C24); g.fillRect(-10,-28,20,44);
-    g.fillStyle(0x8B6914); g.fillCircle(0,-38,10);
-    g.fillStyle(0x8B4513); g.fillRect(-22,-26,4,32); g.fillCircle(-20,-26,5); g.fillCircle(-20,6,5);
-    g.fillStyle(0xC0C0C0); g.fillRect(-20,-12,20,2);
-    g.fillStyle(0x8B0000); g.fillTriangle(-20,-16,-20,-8,-14,-10);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0x8B4513); g.fillRect(-24,-28,5,34); g.strokeRect(-24,-28,5,34);
+    g.fillCircle(-22,-28,6); g.strokeCircle(-22,-28,6);
+    g.fillCircle(-22,6,6); g.strokeCircle(-22,6,6);
+    g.fillStyle(0xC0C0C0); g.fillRect(-22,-14,22,3); g.strokeRect(-22,-14,22,3);
+    g.fillStyle(0x8B0000); g.fillTriangle(-22,-18,-22,-10,-14,-12);
+    g.fillStyle(0x4A7C24); g.fillRect(-12,-28,22,46); g.strokeRect(-12,-28,22,46);
+    g.fillStyle(0x2A5814); g.fillTriangle(-12,-38,12,-36,0,-52); g.strokeTriangle(-12,-38,12,-36,0,-52);
+    g.fillStyle(0xFAD7A0); g.fillCircle(0,-38,12); g.strokeCircle(0,-38,12);
   },
   shadow_rogue(g) {
-    g.fillStyle(0x1C1C1C); g.fillRect(-10,-26,20,42);
-    g.fillStyle(0x2D2D2D); g.fillCircle(0,-36,9);
-    g.fillStyle(0xBDC3C7); g.fillRect(-22,-28,4,24); g.fillTriangle(-22,-28,-18,-28,-20,-36);
-    g.fillRect(18,-28,4,24); g.fillTriangle(18,-28,22,-28,20,-36);
-    g.fillStyle(0xFF0000); g.fillCircle(-2,-34,2); g.fillCircle(2,-34,2);
-    g.fillStyle(0x440044,0.5); g.fillRect(-10,-26,20,42);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0xBDC3C7); g.fillRect(-24,-30,5,26); g.strokeRect(-24,-30,5,26);
+    g.fillTriangle(-24,-30,-20,-30,-22,-38); g.strokeTriangle(-24,-30,-20,-30,-22,-38);
+    g.fillRect(19,-30,5,26); g.strokeRect(19,-30,5,26);
+    g.fillTriangle(19,-30,23,-30,21,-38); g.strokeTriangle(19,-30,23,-30,21,-38);
+    g.fillStyle(0x1C1C1C); g.fillRect(-12,-28,24,44); g.strokeRect(-12,-28,24,44);
+    g.fillStyle(0x440044,0.55); g.fillRect(-12,-28,24,44);
+    g.fillStyle(0x2D2D2D); g.fillCircle(0,-38,11); g.strokeCircle(0,-38,11);
+    g.fillStyle(0xFF0000,0.95); g.fillCircle(-3,-36,3); g.fillCircle(3,-36,3);
   },
   skywing(g) {
-    g.fillStyle(0x0652DD); g.fillRect(-10,-22,20,38);
-    g.fillStyle(0x74B9FF); g.fillCircle(0,-32,10);
-    g.fillStyle(0x0652DD); g.fillTriangle(-12,-18,-38,-36,-10,6); g.fillTriangle(12,-18,38,-36,10,6);
-    g.fillStyle(0x2D3436); g.fillCircle(-6,12,5); g.fillCircle(6,12,5);
-    g.fillStyle(0xFF4400,0.8); g.fillCircle(-6,12,2); g.fillCircle(6,12,2);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0x0652DD); g.fillTriangle(-14,-18,-42,-38,-10,8); g.strokeTriangle(-14,-18,-42,-38,-10,8);
+    g.fillTriangle(14,-18,42,-38,10,8); g.strokeTriangle(14,-18,42,-38,10,8);
+    g.fillStyle(0x0652DD); g.fillRect(-12,-24,24,40); g.strokeRect(-12,-24,24,40);
+    g.fillStyle(0x2D3436); g.fillCircle(-7,14,6); g.strokeCircle(-7,14,6);
+    g.fillCircle(7,14,6); g.strokeCircle(7,14,6);
+    g.fillStyle(0xFF4400,0.9); g.fillCircle(-7,14,3); g.fillCircle(7,14,3);
+    g.fillStyle(0x74B9FF); g.fillCircle(0,-34,12); g.strokeCircle(0,-34,12);
+    g.fillStyle(0x001166); g.fillRect(-7,-38,14,8); g.strokeRect(-7,-38,14,8);
   },
   volt_ranger(g) {
-    g.fillStyle(0xD4AC0D); g.fillRect(-10,-26,20,42);
-    g.fillStyle(0xF9CA24); g.fillCircle(0,-36,10);
-    g.fillStyle(0x0652DD); g.fillRect(-4,-40,8,8);
-    g.fillStyle(0xF9CA24); g.fillRect(-22,-22,3,26); g.fillCircle(-20,-22,4); g.fillCircle(-20,4,4);
-    g.fillStyle(0xFFEE00,0.9); g.fillRect(-20,-10,20,2);
-    g.fillStyle(0xFFEE00); g.fillCircle(10,-8,3); g.fillCircle(14,-12,2);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0xD4AC0D); g.fillRect(-24,-24,5,28); g.strokeRect(-24,-24,5,28);
+    g.fillCircle(-22,-24,5); g.strokeCircle(-22,-24,5);
+    g.fillCircle(-22,4,5); g.strokeCircle(-22,4,5);
+    g.fillStyle(0xFFEE00,0.95); g.fillRect(-22,-12,22,3); g.strokeRect(-22,-12,22,3);
+    g.fillStyle(0xFFEE00); g.fillCircle(12,-8,4); g.fillCircle(16,-14,3);
+    g.fillStyle(0xD4AC0D); g.fillRect(-12,-28,24,44); g.strokeRect(-12,-28,24,44);
+    g.fillStyle(0x0652DD); g.fillRect(-6,-38,12,9); g.strokeRect(-6,-38,12,9);
+    g.fillStyle(0xF9CA24); g.fillCircle(0,-38,12); g.strokeCircle(0,-38,12);
   },
   toxin_toad(g) {
-    g.fillStyle(0x1D8A5E); g.fillEllipse(0,-4,38,42);
-    g.fillStyle(0x27AE60); g.fillCircle(0,-24,16);
-    g.fillStyle(0xFFFF00); g.fillCircle(-7,-26,5); g.fillCircle(7,-26,5);
-    g.fillStyle(0x000000); g.fillCircle(-7,-26,2); g.fillCircle(7,-26,2);
-    g.fillStyle(0x55EFC4); g.fillCircle(-4,22,3); g.fillCircle(4,22,3);
-    g.fillStyle(0x00AA22,0.5); g.fillEllipse(0,8,44,20);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0x00AA22,0.55); g.fillEllipse(0,10,48,22);
+    g.fillStyle(0x1D8A5E); g.fillEllipse(0,-2,40,44); g.strokeEllipse(0,-2,40,44);
+    g.fillStyle(0x27AE60); g.fillCircle(0,-24,18); g.strokeCircle(0,-24,18);
+    g.fillStyle(0xFFFF00); g.fillCircle(-9,-28,7); g.strokeCircle(-9,-28,7);
+    g.fillCircle(9,-28,7); g.strokeCircle(9,-28,7);
+    g.fillStyle(0x000000); g.fillCircle(-9,-28,3); g.fillCircle(9,-28,3);
+    g.fillStyle(0x55EFC4); g.fillCircle(-5,24,4); g.fillCircle(5,24,4);
   },
   neon_wraith(g) {
-    g.fillStyle(0x00CEC9,0.7); g.fillEllipse(0,-10,30,50);
-    g.fillStyle(0xDFE6E9,0.6); g.fillCircle(0,-32,13);
-    g.fillStyle(0x00FFCC); g.fillCircle(-6,-34,5); g.fillCircle(6,-34,5);
-    g.fillStyle(0xFFFFFF); g.fillCircle(-6,-34,2); g.fillCircle(6,-34,2);
-    g.fillStyle(0x00CEC9,0.4); g.fillEllipse(-8,18,10,18); g.fillEllipse(8,20,10,14);
-    g.fillStyle(0x00FFFF,0.6); g.fillCircle(-16,-8,3); g.fillCircle(16,-6,3);
+    g.lineStyle(2,0x00FFCC,0.6);
+    g.fillStyle(0x00CEC9,0.65); g.fillEllipse(0,-8,32,52); g.strokeEllipse(0,-8,32,52);
+    g.fillStyle(0x00CEC9,0.45); g.fillEllipse(-9,20,12,20); g.fillEllipse(9,22,12,16);
+    g.fillStyle(0xDFE6E9,0.55); g.fillCircle(0,-32,15); g.strokeCircle(0,-32,15);
+    g.fillStyle(0x00FFCC,0.95); g.fillCircle(-7,-34,6); g.strokeCircle(-7,-34,6);
+    g.fillCircle(7,-34,6); g.strokeCircle(7,-34,6);
+    g.fillStyle(0xFFFFFF); g.fillCircle(-7,-34,2.5); g.fillCircle(7,-34,2.5);
+    g.fillStyle(0x00FFFF,0.7); g.fillCircle(-18,-10,4); g.fillCircle(18,-8,4);
   },
   forge_dwarf(g) {
-    g.fillStyle(0xA0522D); g.fillRect(-16,-18,32,38);
-    g.fillStyle(0xE17055); g.fillCircle(0,-28,13);
-    g.fillStyle(0x2C3E50); g.fillRect(-10,-32,20,8);
-    g.fillStyle(0xF39C12); g.fillCircle(-5,-29,5); g.fillCircle(5,-29,5);
-    g.fillStyle(0x7F8C8D); g.fillRect(-26,-16,6,26); g.fillRect(-30,-16,14,6); g.fillRect(-30,-10,14,6);
-    g.fillStyle(0xFF8800); g.fillCircle(24,-8,8); g.fillCircle(24,-8,5);
+    g.lineStyle(2,0x111111,0.9);
+    g.fillStyle(0x7F8C8D); g.fillRect(-28,-18,7,28); g.strokeRect(-28,-18,7,28);
+    g.fillRect(-32,-18,16,7); g.strokeRect(-32,-18,16,7);
+    g.fillRect(-32,-10,16,7); g.strokeRect(-32,-10,16,7);
+    g.fillStyle(0xA0522D); g.fillRect(-17,-20,34,40); g.strokeRect(-17,-20,34,40);
+    g.fillStyle(0x7F8C8D); g.fillRect(16,-16,16,12); g.strokeRect(16,-16,16,12);
+    g.fillStyle(0xFF8800,0.9); g.fillCircle(28,-8,9); g.strokeCircle(28,-8,9);
+    g.fillStyle(0xFFCC44); g.fillCircle(28,-8,5);
+    g.fillStyle(0xE17055); g.fillCircle(0,-30,15); g.strokeCircle(0,-30,15);
+    g.fillStyle(0x2C3E50); g.fillRect(-11,-34,22,9); g.strokeRect(-11,-34,22,9);
+    g.fillStyle(0xF39C12); g.fillCircle(-6,-31,6); g.strokeCircle(-6,-31,6);
+    g.fillCircle(6,-31,6); g.strokeCircle(6,-31,6);
   },
   _skeleton(g) {
     g.fillStyle(0xF0E68C); g.fillCircle(0,-26,7);
