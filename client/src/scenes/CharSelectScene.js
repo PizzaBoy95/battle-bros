@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import { CHARACTERS, CHARACTER_IDS, RARITY_COLORS, MYSTERY_SLOTS } from '../characters/CharacterRegistry.js';
 import { DRAW_FUNCS } from '../characters/CharacterGraphics.js';
+import { cardTexKey, placeHero } from '../characters/heroTex.js';
 import { xpProgress } from '../systems/LevelSystem.js';
 import { audioSystem } from '../systems/AudioSystem.js';
 
@@ -262,11 +263,12 @@ export class CharSelectScene extends Phaser.Scene {
     // ── Character portrait — top 68% of card ───────────────────────────────
     const PORTRAIT_H = CH * 0.68;
     const portraitCY = ly + PORTRAIT_H / 2;
-    const portraitKey = charId + '_p';
+    const texKey = cardTexKey(this, charId);
     let portrait;
-    if (this.textures.exists(portraitKey)) {
-      portrait = this.add.image(cx, portraitCY, portraitKey)
-        .setDisplaySize(CW, PORTRAIT_H)
+    if (texKey) {
+      // Imported/vector sprites are aspect-fit; the generated _p portrait fills.
+      const fill = texKey === charId + '_p';
+      portrait = placeHero(this, cx, portraitCY, texKey, CW - 6, PORTRAIT_H - 4, { fill })
         .setDepth(1);
     } else {
       portrait = this.add.graphics().setDepth(1);
@@ -453,9 +455,10 @@ export class CharSelectScene extends Phaser.Scene {
         bg.fillStyle(rc, 0.08);
         bg.fillRect(sx - SLOT_W / 2, sy - SLOT_H / 2, SLOT_W, SLOT_H);
 
-        const pKey = charId + '_p';
-        if (this.textures.exists(pKey)) {
-          const img = this.add.image(sx, sy - 4, pKey).setDisplaySize(SLOT_W - 4, SLOT_H - 8).setDepth(11);
+        const tKey = cardTexKey(this, charId);
+        if (tKey) {
+          const fill = tKey === charId + '_p';
+          const img = placeHero(this, sx, sy - 4, tKey, SLOT_W - 4, SLOT_H - 8, { fill }).setDepth(11);
           objs.push(img);
         } else {
           const mg = this.add.graphics().setDepth(11);
@@ -581,9 +584,10 @@ export class CharSelectScene extends Phaser.Scene {
     // ── Portrait ──────────────────────────────────────────────────────────────
     if (this._infoPortrait) { this._infoPortrait.destroy(); this._infoPortrait = null; }
     const px = -PW / 2 + 56, py = -PH / 2 + 56;
-    const pKey = charId + '_p';
-    if (this.textures.exists(pKey)) {
-      this._infoPortrait = this.add.image(px, py, pKey).setDisplaySize(78, 78);
+    const tKey = cardTexKey(this, charId);
+    if (tKey) {
+      const fill = tKey === charId + '_p';
+      this._infoPortrait = placeHero(this, px, py, tKey, 78, 78, { fill });
     } else {
       this._infoPortrait = this.add.graphics();
       this._infoPortrait.x = px; this._infoPortrait.y = py + 18;

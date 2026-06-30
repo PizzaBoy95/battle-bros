@@ -5,6 +5,7 @@ import { ElixirSystem } from '../systems/ElixirSystem.js';
 import { BattleTimer } from '../systems/BattleTimer.js';
 import { CHARACTERS, CHARACTER_IDS, RARITY_COLORS } from '../characters/CharacterRegistry.js';
 import { DRAW_FUNCS } from '../characters/CharacterGraphics.js';
+import { heroTexKey } from '../characters/heroTex.js';
 import * as EmberCrossing from '../maps/EmberCrossing.js';
 import * as FrostpeakArena from '../maps/FrostpeakArena.js';
 
@@ -352,12 +353,20 @@ export class BattleScene extends Phaser.Scene {
         cardG.strokeRoundedRect(cx - CARD_W / 2 - 1, cy - CARD_H / 2 - 1, CARD_W + 2, CARD_H + 2, 9);
       }
 
-      // Character drawing
-      const charG = this.add.graphics().setDepth(9);
-      charG.x = cx; charG.y = cy - 8;
-      const fn = DRAW_FUNCS[charId];
-      if (fn) fn(charG);
-      charG.setScale(0.44);
+      // Character art — hero sprite if available, else procedural drawing
+      let charG;
+      const cardKey = heroTexKey(this, charId);
+      if (cardKey) {
+        charG = this.add.image(cx, cy - 6, cardKey).setDepth(9);
+        const fit = Math.min((CARD_W - 16) / charG.width, (CARD_H - 26) / charG.height);
+        charG.setScale(fit);
+      } else {
+        charG = this.add.graphics().setDepth(9);
+        charG.x = cx; charG.y = cy - 8;
+        const fn = DRAW_FUNCS[charId];
+        if (fn) fn(charG);
+        charG.setScale(0.44);
+      }
 
       // Elixir cost badge (top-left)
       const elixirG = this.add.graphics().setDepth(9);
@@ -762,18 +771,31 @@ export class BattleScene extends Phaser.Scene {
     const isAir   = char.type === 'air';
     const isMe    = u.owner === this.myKey;
 
+    // Hero sprite (Kenney CC0 / hand-authored vector) if available, else DRAW_FUNCS
+    const texKey   = heroTexKey(this, u.charId);
+    const isSprite = !!texKey;
+
     // Dynamic ground shadow + team ring (behind everything)
     const shadowG = this.add.graphics().setDepth(3);
-    // Animated legs (ground units only, behind body)
-    const legG    = isAir ? null : this.add.graphics().setDepth(4);
+    // Procedural legs only for code-drawn ground units (sprites have their own legs)
+    const legG    = (isAir || isSprite) ? null : this.add.graphics().setDepth(4);
     // Team ring at feet
     const tintG   = this.add.graphics().setDepth(4).setAlpha(0.75);
 
     // Body
-    const g = this.add.graphics().setDepth(5);
-    const drawFn = DRAW_FUNCS[u.charId];
-    if (drawFn) drawFn(g);
-    else { g.fillStyle(0x888888); g.fillCircle(0, 0, 18); }
+    let g, baseScale;
+    if (isSprite) {
+      g = this.add.image(u.x, u.y, texKey).setOrigin(0.5, 0.82).setDepth(5);
+      const srcH = this.textures.get(texKey).getSourceImage().height || 64;
+      baseScale = 60 / srcH;                  // render ~60px tall
+      if (!isMe) g.setFlipX(true);            // enemies face the other way
+    } else {
+      g = this.add.graphics().setDepth(5);
+      const drawFn = DRAW_FUNCS[u.charId];
+      if (drawFn) drawFn(g);
+      else { g.fillStyle(0x888888); g.fillCircle(0, 0, 18); }
+      baseScale = 1;
+    }
 
     // HP bar
     const hpBg  = this.add.rectangle(u.x, u.y, 40, 6, 0x111111).setDepth(6);
@@ -781,7 +803,8 @@ export class BattleScene extends Phaser.Scene {
 
     this.unitGraphics[u.id] = {
       g, tintG, shadowG, legG, hpBg, hpBar,
-      charId: u.charId, char, isAir, isMe,
+      charId: u.charId, char, isAir, isMe, isSprite, baseScale,
+      barOff: isSprite ? 56 : 34,
       color: char.color ?? 0x888888, accent: char.accentColor ?? 0xCCCCCC,
       tx: u.x, ty: u.y, dispX: u.x, dispY: u.y,
       hp: u.hp, maxHp: u.maxHp, state: u.state,
@@ -871,13 +894,14 @@ export class BattleScene extends Phaser.Scene {
 
       // ── Body transform ───────────────────────────────────────────────────
       const lean = (isMoving && !o.isAir ? Math.sin(ph * 0.5) * 0.045 : Math.sin(ph) * 0.02);
+      const bs = o.baseScale * depthSc;
       o.g.setPosition(bx, by + bob);
-      o.g.setScale(depthSc, depthSc * sqStretch);
+      o.g.setScale(bs, bs * sqStretch);
       o.g.setRotation(lean);
 
       // ── HP bar ───────────────────────────────────────────────────────────
       const barW = 36 * depthSc;
-      const barY = by + bob - 34 * depthSc;
+      const barY = by + bob - o.barOff * depthSc;
       o.hpBg.setPosition(o.dispX, barY).setDisplaySize(barW + 4, 6);
       o.hpBar.setPosition(o.dispX - barW / 2, barY).setDisplaySize(barW * Math.max(0, o.hp / o.maxHp), 4).setOrigin(0, 0.5);
     }
