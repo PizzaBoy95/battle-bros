@@ -176,7 +176,8 @@ export class CharSelectScene extends Phaser.Scene {
     }
 
     this.input.on('pointerdown', (p) => {
-      if (p.y < GRID_TOP || p.y > this.gridBottom) return; // outside viewport
+      if (this.infoPanel && this.infoPanel.visible) return; // modal open
+      if (p.y < GRID_TOP || p.y > this.gridBottom) return;  // outside viewport
       this._dragActive = true;
       this._dragMoved  = 0;
       this._lastPtrY   = p.y;
@@ -231,7 +232,7 @@ export class CharSelectScene extends Phaser.Scene {
     for (const [charId, card] of Object.entries(this.cards)) {
       if (px >= card.cx - card.CW / 2 && px <= card.cx + card.CW / 2 &&
           localY >= card.cy - card.CH / 2 && localY <= card.cy + card.CH / 2) {
-        this._toggleCard(charId);
+        this._showInfo(charId);   // open detail modal (stats + add/remove)
         return;
       }
     }
@@ -484,40 +485,187 @@ export class CharSelectScene extends Phaser.Scene {
     }
   }
 
-  // ── Info panel ─────────────────────────────────────────────────────────────
+  // ── Character detail modal ──────────────────────────────────────────────────
   _buildInfoPanel() {
     const { W, H } = this;
-    this.infoPanel = this.add.container(W / 2, H / 2 - 40).setVisible(false).setDepth(50);
+    const PW = 348, PH = 452;
 
-    const bg = this.add.rectangle(0, 0, 320, 238, 0x08081e, 0.97).setStrokeStyle(2, 0xFFD700);
-    this.infoPanel.add(bg);
+    // Dim backdrop (tap outside to close)
+    this.infoBackdrop = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.65)
+      .setDepth(49).setVisible(false).setInteractive();
+    this.infoBackdrop.on('pointerdown', () => this._closeInfo());
 
-    this.infoName  = this.add.text(0, -98, '', { fontSize: '18px', fill: '#FFD700', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(0.5);
-    this.infoRar   = this.add.text(0, -74, '', { fontSize: '11px', fill: '#8899CC', fontFamily: 'Arial' }).setOrigin(0.5);
-    this.infoStats = this.add.text(0, -32, '', { fontSize: '12px', fill: '#FFFFFF', fontFamily: 'Arial', align: 'center' }).setOrigin(0.5);
-    this.infoDesc  = this.add.text(0, 26,  '', { fontSize: '11px', fill: '#BBBBDD', fontFamily: 'Arial', wordWrap: { width: 290 }, align: 'center' }).setOrigin(0.5);
-    this.infoSpec  = this.add.text(0, 80,  '', { fontSize: '11px', fill: '#A29BFE', fontFamily: 'Arial', wordWrap: { width: 290 }, align: 'center' }).setOrigin(0.5);
+    this.infoPanel = this.add.container(W / 2, H / 2).setVisible(false).setDepth(50);
 
-    const closeBtn = this.add.text(140, -108, '✕', {
-      fontSize: '16px', fill: '#666688', fontFamily: 'Arial'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this.infoPanel.setVisible(false));
+    // Panel background (border tint set per-character in _showInfo)
+    this.infoBg = this.add.graphics();
+    this.infoPanel.add(this.infoBg);
 
-    this.infoPanel.add([this.infoName, this.infoRar, this.infoStats, this.infoDesc, this.infoSpec, closeBtn]);
+    // Portrait holder (recreated per character)
+    this._infoPortrait = null;
+
+    // Header texts
+    this.infoName = this.add.text(-PW / 2 + 110, -PH / 2 + 22, '', {
+      fontSize: '20px', fill: '#FFD700', fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 3
+    }).setOrigin(0, 0);
+    this.infoRar = this.add.text(-PW / 2 + 110, -PH / 2 + 50, '', {
+      fontSize: '12px', fill: '#8899CC', fontFamily: 'Arial', fontStyle: 'bold'
+    }).setOrigin(0, 0);
+    this.infoType = this.add.text(-PW / 2 + 110, -PH / 2 + 70, '', {
+      fontSize: '11px', fill: '#AAB4DD', fontFamily: 'Arial'
+    }).setOrigin(0, 0);
+
+    // Stat bars (redrawn per character)
+    this.infoBars  = this.add.graphics();
+    this.infoStatTxt = this.add.text(0, 0, '', { fontSize: '1px' }).setVisible(false); // placeholder
+    this._infoStatLabels = [];
+
+    // Special / description
+    this.infoSpec = this.add.text(0, PH / 2 - 120, '', {
+      fontSize: '11px', fill: '#C9B8FF', fontFamily: 'Arial', fontStyle: 'bold',
+      wordWrap: { width: PW - 36 }, align: 'center'
+    }).setOrigin(0.5, 0);
+
+    // Toggle (add/remove) button
+    this.infoBtnBg = this.add.graphics();
+    this.infoBtnTxt = this.add.text(0, PH / 2 - 40, '', {
+      fontSize: '16px', fill: '#FFFFFF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 3
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    this.infoBtnTxt.on('pointerdown', () => {
+      if (!this._infoCharId) return;
+      this._toggleCard(this._infoCharId);
+      this._showInfo(this._infoCharId); // refresh button state
+    });
+
+    // Close X
+    const closeBtn = this.add.text(PW / 2 - 16, -PH / 2 + 14, '✕', {
+      fontSize: '18px', fill: '#8888AA', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+    }).setOrigin(0.5).setInteractive({ useHandCursor: true });
+    closeBtn.on('pointerdown', () => this._closeInfo());
+
+    this.infoPanel.add([this.infoName, this.infoRar, this.infoType, this.infoBars,
+                        this.infoSpec, this.infoBtnBg, this.infoBtnTxt, closeBtn]);
+    this._PW = PW; this._PH = PH;
+  }
+
+  _closeInfo() {
+    this.infoPanel.setVisible(false);
+    this.infoBackdrop.setVisible(false);
   }
 
   _showInfo(charId) {
-    const char  = CHARACTERS[charId];
-    const cd    = this.charData[charId] || { level: 1, xp: 0 };
-    const rc    = RARITY_COLORS[char.rarity];
-    const { xpInLevel, xpNeeded } = xpProgress(cd.level || 1, cd.xp || 0);
+    const char = CHARACTERS[charId];
+    if (!char) return;
+    this._infoCharId = charId;
+    const cd  = this.charData[charId] || { level: 1, xp: 0 };
+    const rc  = RARITY_COLORS[char.rarity];
+    const rcH = `#${rc.toString(16).padStart(6, '0')}`;
+    const PW = this._PW, PH = this._PH;
 
-    this.infoName .setText(char.name).setStyle({ fill: `#${rc.toString(16).padStart(6, '0')}` });
-    this.infoRar  .setText(`${char.rarity.toUpperCase()}  •  ${char.type === 'air' ? '🪂 Air' : '🦶 Ground'}  •  Lv ${cd.level || 1}/9`);
-    this.infoStats.setText(`❤  HP ${char.hp}   ⚔  DMG ${char.damage}   ⚡ ${char.elixirCost}\nXP ${xpInLevel} / ${xpNeeded || '—'}`);
-    this.infoDesc .setText(char.description || '');
-    this.infoSpec .setText(`✨ ${char.specialDesc}`);
+    // ── Panel background + rarity border ──────────────────────────────────────
+    this.infoBg.clear();
+    this.infoBg.fillStyle(0x0a0a1e, 0.98);
+    this.infoBg.fillRoundedRect(-PW / 2, -PH / 2, PW, PH, 16);
+    this.infoBg.fillStyle(rc, 0.10);
+    this.infoBg.fillRoundedRect(-PW / 2, -PH / 2, PW, 96, { tl: 16, tr: 16, bl: 0, br: 0 });
+    this.infoBg.lineStyle(3, rc, 0.95);
+    this.infoBg.strokeRoundedRect(-PW / 2, -PH / 2, PW, PH, 16);
+    // Portrait frame
+    this.infoBg.fillStyle(0x05050f, 1);
+    this.infoBg.fillRoundedRect(-PW / 2 + 14, -PH / 2 + 14, 84, 84, 10);
+    this.infoBg.lineStyle(2, rc, 0.8);
+    this.infoBg.strokeRoundedRect(-PW / 2 + 14, -PH / 2 + 14, 84, 84, 10);
+
+    // ── Portrait ──────────────────────────────────────────────────────────────
+    if (this._infoPortrait) { this._infoPortrait.destroy(); this._infoPortrait = null; }
+    const px = -PW / 2 + 56, py = -PH / 2 + 56;
+    const pKey = charId + '_p';
+    if (this.textures.exists(pKey)) {
+      this._infoPortrait = this.add.image(px, py, pKey).setDisplaySize(78, 78);
+    } else {
+      this._infoPortrait = this.add.graphics();
+      this._infoPortrait.x = px; this._infoPortrait.y = py + 18;
+      const fn = DRAW_FUNCS[charId];
+      if (fn) fn(this._infoPortrait);
+      this._infoPortrait.setScale(0.6);
+    }
+    this.infoPanel.add(this._infoPortrait);
+    this.infoPanel.bringToTop(this.infoName);
+
+    // ── Header text ───────────────────────────────────────────────────────────
+    this.infoName.setText(char.name).setColor(rcH);
+    this.infoRar.setText(`${char.rarity.toUpperCase()}  •  Lv ${cd.level || 1}/9`).setColor(rcH);
+    this.infoType.setText(char.type === 'air' ? '🪂 Air unit' : '🦶 Ground unit');
+
+    // ── Stat bars ─────────────────────────────────────────────────────────────
+    // [label, value, displayText, maxForBar, barColor]
+    const aps = char.attackSpeed || 1;
+    const rows = [
+      ['Health',      char.hp,          String(char.hp),                3000, 0x2ECC71],
+      ['Damage',      char.damage,      String(char.damage),            260,  0xE74C3C],
+      ['Atk Speed',   aps,              `${aps.toFixed(2)}/s (${(1 / aps).toFixed(1)}s)`, 1.3, 0xF39C12],
+      ['Move Speed',  char.speed,       this._speedWord(char.speed),    95,   0x3498DB],
+      ['Range',       char.range,       `${char.range}`,                300,  0x9B59B6],
+      ['Elixir',      char.elixirCost,  `${char.elixirCost}`,           8,    0xCC55FF],
+    ];
+
+    this.infoBars.clear();
+    for (const t of this._infoStatLabels) t.destroy();
+    this._infoStatLabels = [];
+
+    const barX = -PW / 2 + 22, barW = PW - 130;
+    let yy = -PH / 2 + 116;
+    const rowH = 30;
+    for (const [label, val, disp, max, col] of rows) {
+      // Label
+      const lblT = this.add.text(barX, yy - 2, label, {
+        fontSize: '11px', fill: '#9AA6D0', fontFamily: 'Arial', fontStyle: 'bold'
+      }).setOrigin(0, 0);
+      // Value text (right side)
+      const valT = this.add.text(PW / 2 - 16, yy - 2, disp, {
+        fontSize: '11px', fill: '#FFFFFF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+      }).setOrigin(1, 0);
+      this.infoPanel.add([lblT, valT]);
+      this._infoStatLabels.push(lblT, valT);
+
+      // Bar track + fill
+      const by = yy + 14;
+      this.infoBars.fillStyle(0x1a1a30, 1);
+      this.infoBars.fillRoundedRect(barX, by, barW, 7, 3);
+      const frac = Phaser.Math.Clamp(val / max, 0.04, 1);
+      this.infoBars.fillStyle(col, 0.95);
+      this.infoBars.fillRoundedRect(barX, by, barW * frac, 7, 3);
+      yy += rowH;
+    }
+
+    // ── Special ───────────────────────────────────────────────────────────────
+    this.infoSpec.setText(`✨ ${char.name.split(' ')[0]}'s Special\n${char.specialDesc || ''}`);
+
+    // ── Add / Remove button ───────────────────────────────────────────────────
+    const inDeck = this.selectedDeck.includes(charId);
+    const bw = 260, bh = 42, bx = -bw / 2, byb = PH / 2 - 40 - bh / 2;
+    const btnCol = inDeck ? 0x992222 : 0x227744;
+    const btnBdr = inDeck ? 0xFF5555 : 0x44DD88;
+    this.infoBtnBg.clear();
+    this.infoBtnBg.fillStyle(btnCol, 1);
+    this.infoBtnBg.fillRoundedRect(bx, byb, bw, bh, 10);
+    this.infoBtnBg.fillStyle(0xFFFFFF, 0.08);
+    this.infoBtnBg.fillRoundedRect(bx + 2, byb + 2, bw - 4, bh * 0.42, 8);
+    this.infoBtnBg.lineStyle(2, btnBdr, 0.9);
+    this.infoBtnBg.strokeRoundedRect(bx, byb, bw, bh, 10);
+    this.infoBtnTxt.setText(inDeck ? '✕  REMOVE FROM DECK' : '✓  ADD TO DECK');
+
+    this.infoBackdrop.setVisible(true);
     this.infoPanel.setVisible(true);
+  }
+
+  _speedWord(s) {
+    if (s >= 80) return `${s} (Fast)`;
+    if (s >= 55) return `${s} (Medium)`;
+    if (s >= 40) return `${s} (Slow)`;
+    return `${s} (V.Slow)`;
   }
 
   // ── Selection ──────────────────────────────────────────────────────────────
