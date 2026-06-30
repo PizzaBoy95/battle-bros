@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import { generateAllTextures, generatePortraitTextures } from '../characters/CharacterGraphics.js';
+import { CHAR_ART } from '../characters/CharacterArt.js';
 import { audioSystem } from '../systems/AudioSystem.js';
 
 export class BootScene extends Phaser.Scene {
@@ -16,6 +17,11 @@ export class BootScene extends Phaser.Scene {
     ];
     for (const id of charIds) {
       this.load.image(id, `assets/characters/${id}.png`);
+    }
+
+    // Hand-authored vector (SVG) character art → `<id>_art` textures
+    for (const [id, svg] of Object.entries(CHAR_ART)) {
+      this.load.svg(id + '_art', 'data:image/svg+xml,' + encodeURIComponent(svg), { width: 240, height: 288 });
     }
 
     // Suppress console errors for missing optional assets
