@@ -10,154 +10,206 @@ export class LootBoxScene extends Phaser.Scene {
   constructor() { super('LootBox'); }
 
   init(data) {
-    this.reward = data?.reward || { rarity: 'common', gold: 100, charReward: null };
+    this.reward     = data?.reward || { rarity: 'common', gold: 100, charReward: null };
     this.clickCount = 0;
     this.clickStart = null;
-    this.opened = false;
-    this.phase = 'locked'; // locked | opening | revealed
+    this.opened     = false;
+    this.phase      = 'locked';
+    this._shakeOff  = null;
   }
 
   create() {
     const { width: W, height: H } = this.scale;
+    const rarityData = RARITIES[this.reward.rarity] || RARITIES.common;
+    this.rarityCol   = rarityData.color;
 
-    // Background
-    this.add.rectangle(0, 0, W, H, 0x050510).setOrigin(0);
+    // ── Background ────────────────────────────────────────────────────────────
+    const bg = this.add.graphics();
+    bg.fillGradientStyle(0x030310, 0x030310, 0x08071a, 0x060515, 1);
+    bg.fillRect(0, 0, W, H);
     this._drawStars();
 
-    // Title
-    this.add.text(W / 2, 50, 'LOOT BOX', {
-      fontSize: '30px', fill: '#FFD700',
-      fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
-    }).setOrigin(0.5);
+    // Ambient rarity glow on floor
+    const glowG = this.add.graphics().setDepth(1);
+    glowG.fillStyle(this.rarityCol, 0.07);
+    glowG.fillEllipse(W / 2, H * 0.62, 260, 80);
 
-    // Instruction
-    this.instructionText = this.add.text(W / 2, 90, 'TAP RAPIDLY TO UNLOCK!', {
-      fontSize: '15px', fill: '#AAAACC', fontFamily: 'Arial', letterSpacing: 2
-    }).setOrigin(0.5);
+    // ── Title ─────────────────────────────────────────────────────────────────
+    this.add.text(W / 2, 38, 'LOOT CHEST', {
+      fontSize: '28px', fill: '#FFD700',
+      fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+      stroke: '#332200', strokeThickness: 5
+    }).setOrigin(0.5).setDepth(3);
 
-    this.tweens.add({ targets: this.instructionText, alpha: 0.3, duration: 500, yoyo: true, repeat: -1 });
+    const colH = `#${this.rarityCol.toString(16).padStart(6, '0')}`;
+    this.add.text(W / 2, 68, `✦  ${(rarityData.label || this.reward.rarity).toUpperCase()}  ✦`, {
+      fontSize: '13px', fill: colH, fontFamily: 'Arial', fontStyle: 'bold', letterSpacing: 3
+    }).setOrigin(0.5).setDepth(3);
 
-    // Box graphics
-    this.boxG = this.add.graphics().setDepth(5);
-    this.boxX = W / 2;
-    this.boxY = H / 2;
-    this._drawBox(false);
+    // ── Instruction (blink) ───────────────────────────────────────────────────
+    this.instructionText = this.add.text(W / 2, H * 0.75, 'TAP THE CHEST TO UNLOCK!', {
+      fontSize: '14px', fill: '#AAAACC', fontFamily: 'Arial', letterSpacing: 2
+    }).setOrigin(0.5).setDepth(3);
+    this.tweens.add({ targets: this.instructionText, alpha: 0.25, duration: 520, yoyo: true, repeat: -1 });
 
-    // Padlock
-    this.lockG = this.add.graphics().setDepth(6);
-    this._drawLock();
+    // ── Chest ─────────────────────────────────────────────────────────────────
+    this.chestContainer = this.add.container(W / 2, H * 0.38).setDepth(5);
+    this.boxG  = this.add.graphics();
+    this.lidG  = this.add.graphics();
+    this.lockG = this.add.graphics();
+    this.glintG = this.add.graphics();
+    this.chestContainer.add([this.boxG, this.lidG, this.lockG, this.glintG]);
+    this._drawChest();
 
-    // Click progress bar
-    this.progressBg = this.add.rectangle(W / 2, H * 0.73, 260, 14, 0x1a1a2e)
-      .setStrokeStyle(1, 0x333355).setDepth(7);
-    this.progressBar = this.add.rectangle(W / 2 - 128, H * 0.73, 2, 10, 0xFFD700)
-      .setOrigin(0, 0.5).setDepth(8);
+    // Idle float tween
+    this._floatTween = this.tweens.add({
+      targets: this.chestContainer, y: H * 0.38 - 8,
+      duration: 1600, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+    });
 
-    this.clickLabel = this.add.text(W / 2, H * 0.73 + 22, `0 / ${CLICKS_NEEDED} clicks`, {
-      fontSize: '13px', fill: '#AAAACC', fontFamily: 'Arial'
-    }).setOrigin(0.5).setDepth(8);
+    // ── Progress bar ──────────────────────────────────────────────────────────
+    const barY = H * 0.77;
+    const BAR_W = 260, BAR_H = 16;
+    const barBg = this.add.graphics().setDepth(4);
+    barBg.fillStyle(0x0e0e28, 0.9); barBg.fillRoundedRect(W / 2 - BAR_W / 2, barY - BAR_H / 2, BAR_W, BAR_H, 8);
+    barBg.lineStyle(1.5, 0x223355, 0.7); barBg.strokeRoundedRect(W / 2 - BAR_W / 2, barY - BAR_H / 2, BAR_W, BAR_H, 8);
 
-    // Skip button
-    this.add.text(W / 2, H - 40, '[ SKIP ]', {
-      fontSize: '13px', fill: '#444466', fontFamily: 'Arial'
-    }).setOrigin(0.5).setInteractive({ useHandCursor: true })
-      .on('pointerdown', () => this._openBox());
+    this.progressFill = this.add.graphics().setDepth(5);
+    this._drawProgress(0);
 
-    // Main tap area
-    const tapZone = this.add.zone(W / 2, H / 2 - 30, 280, 280)
-      .setInteractive({ useHandCursor: true }).setDepth(10);
-    tapZone.on('pointerdown', () => this._handleClick());
+    this.clickLabel = this.add.text(W / 2, barY + 16, `0 / ${CLICKS_NEEDED}`, {
+      fontSize: '12px', fill: '#6688AA', fontFamily: 'Arial'
+    }).setOrigin(0.5).setDepth(5);
 
-    this.cameras.main.fadeIn(400);
+    // ── Skip button ───────────────────────────────────────────────────────────
+    const skip = this.add.text(W / 2, H - 38, '[ SKIP ]', {
+      fontSize: '13px', fill: '#334455', fontFamily: 'Arial'
+    }).setOrigin(0.5).setDepth(5).setInteractive({ useHandCursor: true });
+    skip.on('pointerover', () => skip.setStyle({ fill: '#8899AA' }));
+    skip.on('pointerout',  () => skip.setStyle({ fill: '#334455' }));
+    skip.on('pointerdown', () => this._openBox());
+
+    // ── Tap zone (whole upper screen) ────────────────────────────────────────
+    this.add.zone(W / 2, H * 0.38, 300, 300)
+      .setInteractive({ useHandCursor: true }).setDepth(10)
+      .on('pointerdown', () => this._handleClick());
+
+    this.cameras.main.fadeIn(350);
   }
 
-  _drawStars() {
+  // ── Chest drawing ──────────────────────────────────────────────────────────
+  _drawChest(lidAngle = 0) {
+    const col   = this.rarityCol;
+    const BW = 110, BH = 72, LH = 38;
+
+    this.boxG.clear(); this.lidG.clear(); this.lockG.clear(); this.glintG.clear();
+
+    // Shadow on floor
+    this.boxG.fillStyle(0x000000, 0.28);
+    this.boxG.fillEllipse(0, BH / 2 + 8, BW + 20, 14);
+
+    // ── Body ──────────────────────────────────────────────────────────────────
+    // Dark wood base
+    this.boxG.fillStyle(0x3B1E08);
+    this.boxG.fillRoundedRect(-BW / 2, 0, BW, BH, { bl: 10, br: 10, tl: 0, tr: 0 });
+    // Wood grain highlight
+    this.boxG.fillStyle(0x5A2E10, 0.7);
+    this.boxG.fillRoundedRect(-BW / 2 + 4, 4, BW - 8, BH - 8, { bl: 8, br: 8, tl: 0, tr: 0 });
+    // Metal band
+    this.boxG.fillStyle(0x888888);
+    this.boxG.fillRect(-BW / 2, BH * 0.38, BW, 10);
+    this.boxG.fillStyle(0xBBBBBB, 0.5);
+    this.boxG.fillRect(-BW / 2 + 2, BH * 0.38 + 1, BW - 4, 4);
+    // Rarity accent strips
+    this.boxG.fillStyle(col, 0.55);
+    this.boxG.fillRect(-BW / 2, BH * 0.38, BW, 3);
+    this.boxG.fillRect(-BW / 2, BH * 0.38 + 7, BW, 3);
+    // Corner studs
+    [[- BW / 2 + 6, 6], [BW / 2 - 14, 6], [-BW / 2 + 6, BH - 14], [BW / 2 - 14, BH - 14]].forEach(([sx, sy]) => {
+      this.boxG.fillStyle(0xBBBBBB); this.boxG.fillRect(sx, sy, 8, 8);
+      this.boxG.fillStyle(0xFFFFFF, 0.3); this.boxG.fillRect(sx + 1, sy + 1, 3, 3);
+    });
+    // Body border
+    this.boxG.lineStyle(2, col, 0.7);
+    this.boxG.strokeRoundedRect(-BW / 2, 0, BW, BH, { bl: 10, br: 10, tl: 0, tr: 0 });
+
+    // ── Lid (hinged at top of body) ───────────────────────────────────────────
+    const lidY = -lidAngle * LH * 0.6;
+    this.lidG.fillStyle(0x4A2510);
+    this.lidG.fillRoundedRect(-BW / 2, lidY - LH, BW, LH + 4, { tl: 10, tr: 10, bl: 0, br: 0 });
+    this.lidG.fillStyle(0x6A3518, 0.7);
+    this.lidG.fillRoundedRect(-BW / 2 + 4, lidY - LH + 4, BW - 8, LH - 6, { tl: 8, tr: 8, bl: 0, br: 0 });
+    // Lid metal band
+    this.lidG.fillStyle(0x999999);
+    this.lidG.fillRect(-BW / 2, lidY - 6, BW, 8);
+    this.lidG.fillStyle(0xCCCCCC, 0.4);
+    this.lidG.fillRect(-BW / 2 + 2, lidY - 5, BW - 4, 3);
+    this.lidG.fillStyle(col, 0.55);
+    this.lidG.fillRect(-BW / 2, lidY - 6, BW, 3);
+    // Lid border
+    this.lidG.lineStyle(2, col, 0.7);
+    this.lidG.strokeRoundedRect(-BW / 2, lidY - LH, BW, LH + 4, { tl: 10, tr: 10, bl: 0, br: 0 });
+
+    // ── Padlock (front center) ─────────────────────────────────────────────────
+    this.lockG.fillStyle(0xAAAAAA);
+    this.lockG.fillRoundedRect(-14, -10, 28, 22, 5);
+    this.lockG.fillStyle(0xCCCCCC, 0.4);
+    this.lockG.fillRoundedRect(-12, -8, 12, 8, 3);
+    this.lockG.lineStyle(5.5, 0xAAAAAA);
+    this.lockG.beginPath(); this.lockG.arc(0, -10, 10, Math.PI, 0, false); this.lockG.strokePath();
+    this.lockG.fillStyle(0x666666); this.lockG.fillCircle(0, -1, 5);
+    this.lockG.fillRect(-1.5, -1, 3, 8);
+    // Rarity tint on lock
+    this.lockG.lineStyle(1.5, col, 0.5);
+    this.lockG.strokeRoundedRect(-14, -10, 28, 22, 5);
+
+    // ── Glint (top corner specular) ───────────────────────────────────────────
+    this.glintG.fillStyle(0xFFFFFF, 0.22);
+    this.glintG.fillTriangle(-BW / 2 + 6, lidY - LH + 4, -BW / 2 + 26, lidY - LH + 4, -BW / 2 + 6, lidY - LH + 18);
+  }
+
+  _drawProgress(pct) {
     const { width: W, height: H } = this.scale;
-    const g = this.add.graphics();
-    for (let i = 0; i < 60; i++) {
-      g.fillStyle(0xFFFFFF, 0.1 + Math.random() * 0.4);
-      g.fillRect(Math.random() * W, Math.random() * H, 1, 1);
-    }
+    const BAR_W = 260, BAR_H = 16, barY = H * 0.77;
+    const col = pct >= 1 ? 0x44FF88 : this.rarityCol;
+    this.progressFill.clear();
+    if (pct <= 0) return;
+    this.progressFill.fillStyle(col, 0.8);
+    this.progressFill.fillRoundedRect(W / 2 - BAR_W / 2 + 2, barY - BAR_H / 2 + 2, (BAR_W - 4) * pct, BAR_H - 4, 6);
+    this.progressFill.fillStyle(0xFFFFFF, 0.18);
+    this.progressFill.fillRoundedRect(W / 2 - BAR_W / 2 + 2, barY - BAR_H / 2 + 2, (BAR_W - 4) * pct * 0.55, (BAR_H - 4) * 0.45, 4);
   }
 
-  _drawBox(glowing) {
-    const rarityData = RARITIES[this.reward.rarity] || RARITIES.common;
-    const color = rarityData.color;
-    const x = this.boxX, y = this.boxY;
-    const bw = 120, bh = 110;
-
-    this.boxG.clear();
-
-    if (glowing) {
-      this.boxG.fillStyle(color, 0.15);
-      this.boxG.fillRoundedRect(x - bw - 16, y - bh - 16, (bw + 16) * 2, (bh + 16) * 2, 18);
-    }
-
-    // Box body
-    this.boxG.fillStyle(0x1a0800);
-    this.boxG.fillRoundedRect(x - bw, y - bh / 2, bw * 2, bh, 12);
-
-    // Box lid (top half)
-    this.boxG.fillStyle(0x2a1010);
-    this.boxG.fillRoundedRect(x - bw, y - bh, bw * 2, bh / 2 + 8, 12);
-
-    // Rarity border
-    this.boxG.lineStyle(3, color, 0.9);
-    this.boxG.strokeRoundedRect(x - bw, y - bh, bw * 2, bh * 1.5, 12);
-
-    // Ribbon / bow
-    this.boxG.fillStyle(color);
-    this.boxG.fillRect(x - 8, y - bh, 16, bh * 1.5);
-    this.boxG.fillRect(x - bw, y - 14, bw * 2, 14);
-
-    // Corner details
-    this.boxG.fillStyle(color, 0.3);
-    this.boxG.fillRect(x - bw + 8, y - bh + 8, 20, 20);
-    this.boxG.fillRect(x + bw - 28, y - bh + 8, 20, 20);
-  }
-
-  _drawLock() {
-    const x = this.boxX, y = this.boxY - 60;
-    this.lockG.clear();
-    this.lockG.fillStyle(0xC0C0C0);
-    this.lockG.fillRoundedRect(x - 16, y, 32, 26, 4);
-    this.lockG.lineStyle(6, 0xC0C0C0);
-    this.lockG.beginPath();
-    this.lockG.arc(x, y, 14, Math.PI, 0, false);
-    this.lockG.strokePath();
-    this.lockG.fillStyle(0x888888);
-    this.lockG.fillCircle(x, y + 14, 5);
-    this.lockG.fillRect(x - 1.5, y + 14, 3, 8);
-  }
-
+  // ── Interaction ────────────────────────────────────────────────────────────
   _handleClick() {
-    if (this.opened) return;
-    if (this.phase === 'revealing') return;
-
+    if (this.opened || this.phase === 'opening') return;
     const now = Date.now();
 
     if (!this.clickStart) {
       this.clickStart = now;
-      this.clickTimer = setTimeout(() => this._resetClicks(), CLICK_WINDOW_MS);
+      this._shakeOff = setTimeout(() => this._resetClicks(), CLICK_WINDOW_MS);
     }
 
     this.clickCount++;
     audioSystem.playClick();
 
-    // Shake box
+    // Chest shake
     this.tweens.add({
-      targets: this.boxG,
-      x: this.boxX + (Math.random() - 0.5) * 14,
-      duration: 60, yoyo: true, ease: 'Linear'
+      targets: this.chestContainer,
+      x: `+=${(Math.random() - 0.5) * 18}`,
+      duration: 55, yoyo: true, ease: 'Linear'
     });
+    // Lid crack open slightly more with each click
+    const lidFraction = Math.min(1, this.clickCount / CLICKS_NEEDED);
+    this._drawChest(lidFraction * 0.45);
 
-    // Update progress
-    const pct = Math.min(1, this.clickCount / CLICKS_NEEDED);
-    this.progressBar.setDisplaySize(256 * pct, 10);
-    this.clickLabel.setText(`${this.clickCount} / ${CLICKS_NEEDED} clicks`);
+    // Rarity glow pulse
+    const pct = this.clickCount / CLICKS_NEEDED;
+    this._drawProgress(pct);
+    this.clickLabel.setText(`${this.clickCount} / ${CLICKS_NEEDED}`);
 
-    if (pct === 1 && pct >= 1 && this.clickCount === CLICKS_NEEDED) {
-      clearTimeout(this.clickTimer);
+    if (this.clickCount >= CLICKS_NEEDED) {
+      if (this._shakeOff) clearTimeout(this._shakeOff);
       this._openBox();
     }
   }
@@ -166,89 +218,114 @@ export class LootBoxScene extends Phaser.Scene {
     if (this.opened) return;
     this.clickCount = 0;
     this.clickStart = null;
-    this.progressBar.setDisplaySize(2, 10);
-    this.clickLabel.setText(`0 / ${CLICKS_NEEDED} clicks`);
-
-    // Shake lockG as "nope"
-    this.tweens.add({ targets: this.lockG, x: -8, duration: 60, yoyo: true, repeat: 2, ease: 'Linear' });
+    this._drawProgress(0);
+    this._drawChest(0);
+    this.clickLabel.setText(`0 / ${CLICKS_NEEDED}`);
+    this.tweens.add({ targets: this.chestContainer, x: `+=10`, duration: 55, yoyo: true, repeat: 3, ease: 'Linear' });
   }
 
   _openBox() {
     if (this.opened) return;
-    this.opened = true;
-    this.phase = 'opening';
+    this.opened = true; this.phase = 'opening';
 
-    // Shatter animation
+    this._floatTween?.stop();
+    this._drawChest(1);
+    this._drawProgress(1);
+    this.clickLabel.setText('UNLOCKED!').setStyle({ fill: '#44FF88' });
+    this.instructionText.setVisible(false);
+
+    audioSystem.playLootOpen?.();
+
+    // Blast the chest open
     this.tweens.add({
-      targets: [this.boxG, this.lockG],
-      scaleX: 1.3, scaleY: 1.3, alpha: 0,
-      duration: 350, ease: 'Power2',
-      onComplete: () => this._reveal()
+      targets: this.chestContainer,
+      scaleX: 1.18, scaleY: 1.18, y: `-=12`,
+      duration: 120, yoyo: true, ease: 'Back.easeOut',
+      onComplete: () => {
+        this.tweens.add({
+          targets: this.chestContainer,
+          alpha: 0, scaleX: 0.5, scaleY: 0.5,
+          duration: 300, ease: 'Power2',
+          onComplete: () => this._reveal()
+        });
+      }
     });
-
-    audioSystem.playLootOpen();
-    this.progressBar.setDisplaySize(256, 10);
-    this.clickLabel.setText('UNLOCKED!').setStyle({ fill: '#FFD700' });
   }
 
   _reveal() {
     const { width: W, height: H } = this.scale;
     this.phase = 'revealed';
-
+    const col  = this.rarityCol;
+    const colH = `#${col.toString(16).padStart(6, '0')}`;
     const rarityData = RARITIES[this.reward.rarity] || RARITIES.common;
-    const color = rarityData.color;
-    const colorHex = `#${color.toString(16).padStart(6, '0')}`;
 
-    // Big glow burst
+    // Big burst ring
     const burst = this.add.graphics().setDepth(12);
-    burst.fillStyle(color, 0.4);
-    burst.fillCircle(W / 2, H / 2, 160);
-    this.tweens.add({ targets: burst, alpha: 0, scaleX: 2.5, scaleY: 2.5, duration: 700, onComplete: () => burst.destroy() });
+    burst.lineStyle(12, col, 0.7); burst.strokeCircle(W / 2, H / 2, 10);
+    this.tweens.add({ targets: burst, scaleX: 18, scaleY: 18, alpha: 0, duration: 600, ease: 'Power2', onComplete: () => burst.destroy() });
 
-    // Rarity label
-    const rarityText = this.add.text(W / 2, H / 2 - 90, rarityData.label, {
-      fontSize: '36px', fill: colorHex,
+    // Floor glow
+    const glow = this.add.graphics().setDepth(11);
+    glow.fillStyle(col, 0.22); glow.fillEllipse(W / 2, H * 0.55, 300, 120);
+    this.tweens.add({ targets: glow, alpha: 0, duration: 900, onComplete: () => glow.destroy() });
+
+    // Rarity label — big drop-in
+    const rarityText = this.add.text(W / 2, H * 0.28, rarityData.label?.toUpperCase() || this.reward.rarity.toUpperCase(), {
+      fontSize: '46px', fill: colH,
       fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
-      stroke: '#000000', strokeThickness: 7
-    }).setOrigin(0.5).setAlpha(0).setScale(0.3).setDepth(15);
-
-    this.tweens.add({ targets: rarityText, alpha: 1, scaleX: 1, scaleY: 1, duration: 500, ease: 'Back.easeOut' });
+      stroke: '#000000', strokeThickness: 8
+    }).setOrigin(0.5).setAlpha(0).setScale(0.25).setDepth(15);
+    this.tweens.add({ targets: rarityText, alpha: 1, scaleX: 1, scaleY: 1, duration: 520, ease: 'Back.easeOut' });
 
     // Gold reward
-    const goldText = this.add.text(W / 2, H / 2 - 20, `💰 +${this.reward.gold} GOLD`, {
-      fontSize: '28px', fill: '#FFD700',
-      fontFamily: 'Arial', fontStyle: 'bold'
+    const goldText = this.add.text(W / 2, H * 0.44, `💰  +${this.reward.gold} GOLD`, {
+      fontSize: '30px', fill: '#FFD700',
+      fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+      stroke: '#332200', strokeThickness: 4
     }).setOrigin(0.5).setAlpha(0).setDepth(15);
-
-    this.time.delayedCall(300, () => {
-      this.tweens.add({ targets: goldText, alpha: 1, y: goldText.y - 10, duration: 400 });
+    this.time.delayedCall(280, () => {
+      this.tweens.add({ targets: goldText, alpha: 1, y: goldText.y - 8, duration: 380, ease: 'Sine.easeOut' });
     });
 
-    // Character reward
+    // Character card reward
     if (this.reward.charReward) {
-      const charText = this.add.text(W / 2, H / 2 + 40, `🃏 ${this.reward.charReward.replace(/_/g, ' ').toUpperCase()} CARD`, {
-        fontSize: '16px', fill: '#A29BFE', fontFamily: 'Arial', fontStyle: 'bold'
-      }).setOrigin(0.5).setAlpha(0).setDepth(15);
-      this.time.delayedCall(500, () => { this.tweens.add({ targets: charText, alpha: 1, duration: 400 }); });
+      const cardBg = this.add.graphics().setDepth(14);
+      cardBg.fillStyle(col, 0.18); cardBg.fillRoundedRect(W / 2 - 120, H * 0.54, 240, 38, 8);
+      cardBg.lineStyle(1.5, col, 0.6); cardBg.strokeRoundedRect(W / 2 - 120, H * 0.54, 240, 38, 8);
+      const charText = this.add.text(W / 2, H * 0.54 + 19,
+        `🃏  ${this.reward.charReward.replace(/_/g, ' ').toUpperCase()}  CARD`, {
+          fontSize: '14px', fill: colH, fontFamily: 'Arial', fontStyle: 'bold'
+        }).setOrigin(0.5).setAlpha(0).setDepth(15);
+      this.time.delayedCall(480, () => { this.tweens.add({ targets: [cardBg, charText], alpha: 1, duration: 350 }); });
     }
 
-    // Claim & save
     this._claimReward();
-
-    // Particle celebration
-    this._spawnParticles(color);
+    this._spawnParticles(col);
 
     // Continue button
-    this.time.delayedCall(1000, () => {
-      this.add.text(W / 2, H - 70, '[ CONTINUE ]', {
+    this.time.delayedCall(950, () => {
+      const btnG = this.add.graphics().setDepth(16);
+      btnG.fillStyle(0xBB8800, 0.92);
+      btnG.fillRoundedRect(W / 2 - 130, H - 88, 260, 48, 10);
+      btnG.fillStyle(0xFFFFFF, 0.07); btnG.fillRoundedRect(W / 2 - 128, H - 86, 256, 20, 8);
+      btnG.lineStyle(2, 0xFFD700, 0.8); btnG.strokeRoundedRect(W / 2 - 130, H - 88, 260, 48, 10);
+
+      const btnTxt = this.add.text(W / 2, H - 64, 'CONTINUE  →', {
         fontSize: '18px', fill: '#FFFFFF',
-        fontFamily: 'Arial', fontStyle: 'bold',
-        backgroundColor: '#1a1a2e',
-        padding: { x: 20, y: 10 }
-      }).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(16)
-        .on('pointerdown', () => {
-          this.scene.start('MainMenu');
-        });
+        fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+        stroke: '#331100', strokeThickness: 3
+      }).setOrigin(0.5).setDepth(17).setInteractive({ useHandCursor: true });
+
+      btnTxt.on('pointerover', () => { btnG.setAlpha(0.8); btnTxt.setScale(1.04); });
+      btnTxt.on('pointerout',  () => { btnG.setAlpha(1);   btnTxt.setScale(1); });
+      btnTxt.on('pointerdown', () => {
+        audioSystem.playClick();
+        this.cameras.main.fadeOut(220, 0, 0, 0);
+        this.cameras.main.once('camerafadeoutcomplete', () => this.scene.start('MainMenu'));
+      });
+
+      this.tweens.add({ targets: [btnG, btnTxt], alpha: 0, duration: 0 });
+      this.tweens.add({ targets: [btnG, btnTxt], alpha: 1, duration: 400 });
     });
   }
 
@@ -257,47 +334,48 @@ export class LootBoxScene extends Phaser.Scene {
       const token = this.registry.get('token') || localStorage.getItem('bb_token');
       const res = await fetch(`${SERVER_URL}/auth/loot/claim`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          rarity: this.reward.rarity,
-          goldReward: this.reward.gold,
-          charReward: this.reward.charReward
-        })
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+        body: JSON.stringify({ rarity: this.reward.rarity, goldReward: this.reward.gold, charReward: this.reward.charReward })
       });
       if (res.ok) {
         const data = await res.json();
         this.registry.set('gold', data.gold);
         localStorage.setItem('bb_gold', String(data.gold));
       }
-    } catch (e) {
-      console.warn('Could not claim reward:', e);
+    } catch (e) { console.warn('Could not claim reward:', e); }
+  }
+
+  _drawStars() {
+    const { width: W, height: H } = this.scale;
+    const g = this.add.graphics().setDepth(1);
+    for (let i = 0; i < 90; i++) {
+      const a = 0.06 + Math.random() * 0.5;
+      const s = Math.random() < 0.12 ? 2 : 1;
+      g.fillStyle(0xFFFFFF, a);
+      g.fillRect(Math.random() * W, Math.random() * H, s, s);
     }
   }
 
-  _spawnParticles(color) {
+  _spawnParticles(col) {
     const { width: W, height: H } = this.scale;
-    const g = this.add.graphics().setDepth(14);
-    const particles = Array.from({ length: 30 }, () => ({
-      x: W / 2 + (Math.random() - 0.5) * 60,
-      y: H / 2,
-      vx: (Math.random() - 0.5) * 6,
-      vy: -(2 + Math.random() * 5),
+    const g = this.add.graphics().setDepth(13);
+    const SEC = [0xFFD700, 0xFFFFFF, col];
+    const particles = Array.from({ length: 50 }, () => ({
+      x: W / 2 + (Math.random() - 0.5) * 40,
+      y: H * 0.52,
+      vx: (Math.random() - 0.5) * 7,
+      vy: -(3 + Math.random() * 6),
+      col: SEC[Math.floor(Math.random() * SEC.length)],
+      s: 3 + Math.random() * 5,
       life: 1
     }));
-
     this.time.addEvent({
-      delay: 16, repeat: 60,
+      delay: 16, repeat: 90,
       callback: () => {
         g.clear();
         for (const p of particles) {
-          p.x += p.vx; p.y += p.vy; p.vy += 0.15; p.life -= 0.015;
-          if (p.life > 0) {
-            g.fillStyle(color, p.life);
-            g.fillRect(p.x, p.y, 5, 5);
-          }
+          p.x += p.vx; p.y += p.vy; p.vy += 0.14; p.life -= 0.011;
+          if (p.life > 0) { g.fillStyle(p.col, p.life); g.fillRect(Math.round(p.x), Math.round(p.y), p.s, p.s); }
         }
       }
     });
