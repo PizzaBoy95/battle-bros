@@ -95,8 +95,13 @@ export class BattleScene extends Phaser.Scene {
     // Deploy zone indicator
     this._buildDeployZone();
 
-    // Deck hand at bottom
+    // Clash-style hand: 4 cards in hand, the rest cycle through a queue
+    this.hand  = this.deck.slice(0, 4);
+    this.queue = this.deck.slice(4);
     this._buildHandCards();
+
+    // 3…2…1…FIGHT! intro
+    this._battleCountdown();
 
     // Drag-to-deploy global listeners
     this._dragging = false;
@@ -256,26 +261,68 @@ export class BattleScene extends Phaser.Scene {
     }).setOrigin(0.5).setDepth(2).setAlpha(0.4);
   }
 
+  // Card in slot idx was played → next queued card takes its place (CR cycle)
+  _cycleCard(idx) {
+    if (!this.queue?.length || !this.hand) return;
+    const used = this.hand[idx];
+    this.hand[idx] = this.queue.shift();
+    this.queue.push(used);
+    this._rebuildTray();
+  }
+
+  _rebuildTray() {
+    for (const c of this.handCards || []) {
+      [c.cardG, c.charG, c.elixirG, c.costText, c.nameText, c.zone].forEach(o => o?.destroy());
+    }
+    (this._nextObjs || []).forEach(o => o?.destroy());
+    this._buildHandCards();
+    this._refreshHandCards();
+  }
+
   _buildHandCards() {
     const { width: W, height: H } = this.scale;
     const CARD_W = 64, CARD_H = 96;
     const GAP = 6;
-    const totalCards = Math.min(this.deck.length, DECK_SIZE);
+    const totalCards = Math.min(this.hand.length, 4);
     const totalW = totalCards * (CARD_W + GAP) - GAP;
-    const startX = W / 2 - totalW / 2 + CARD_W / 2;
-    // Card tray background — rounded top edge
-    const barG = this.add.graphics().setDepth(7);
-    barG.fillStyle(0x040410, 0.95);
-    barG.fillRoundedRect(0, H - CARD_H - 32, W, CARD_H + 32, { tl: 14, tr: 14, bl: 0, br: 0 });
-    barG.lineStyle(1.5, 0x2244AA, 0.45);
-    barG.strokeRoundedRect(0, H - CARD_H - 32, W, CARD_H + 32, { tl: 14, tr: 14, bl: 0, br: 0 });
+    const startX = (W - 74) / 2 - totalW / 2 + CARD_W / 2;   // leave room for NEXT slot
+    // Card tray background — rounded top edge (built once)
+    if (!this._trayBar) {
+      this._trayBar = this.add.graphics().setDepth(7);
+      this._trayBar.fillStyle(0x040410, 0.95);
+      this._trayBar.fillRoundedRect(0, H - CARD_H - 32, W, CARD_H + 32, { tl: 14, tr: 14, bl: 0, br: 0 });
+      this._trayBar.lineStyle(1.5, 0x2244AA, 0.45);
+      this._trayBar.strokeRoundedRect(0, H - CARD_H - 32, W, CARD_H + 32, { tl: 14, tr: 14, bl: 0, br: 0 });
+    }
 
     const cardY = H - CARD_H / 2 - 14;
 
     this.handCards = [];
 
+    // ── NEXT card preview (right side, smaller + dimmed) ────────────────────
+    this._nextObjs = [];
+    const nx = W - 40;
+    if (this.queue?.length) {
+      const nId = this.queue[0];
+      const ng = this.add.graphics().setDepth(8);
+      ng.fillStyle(0x0A0A18, 0.9); ng.fillRoundedRect(nx - 24, cardY - 30, 48, 68, 7);
+      ng.lineStyle(1.5, 0x445588, 0.8); ng.strokeRoundedRect(nx - 24, cardY - 30, 48, 68, 7);
+      this._nextObjs.push(ng);
+      const nKey = cardTexKey(this, nId);
+      if (nKey) {
+        const img = this.add.image(nx, cardY - 2, nKey).setDepth(9).setAlpha(0.75);
+        const src = this.textures.get(nKey).getSourceImage();
+        const s = Math.min(38 / src.width, 48 / src.height);
+        img.setDisplaySize(src.width * s, src.height * s);
+        this._nextObjs.push(img);
+      }
+      this._nextObjs.push(this.add.text(nx, cardY - 40, 'NEXT', {
+        fontSize: '9px', fill: '#8899BB', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+      }).setOrigin(0.5).setDepth(9));
+    }
+
     for (let i = 0; i < totalCards; i++) {
-      const charId = this.deck[i];
+      const charId = this.hand[i];
       if (!charId) continue;
       const char = CHARACTERS[charId];
       if (!char) continue;
@@ -477,6 +524,7 @@ export class BattleScene extends Phaser.Scene {
         this._buildDeployIndicator(ptr.x, ptr.y);
         this.myElixir = Math.max(0, this.myElixir - char.elixirCost);
         this.elixirSystem.update(this.myElixir, this.elixirRate || 1);
+        this._cycleCard(this._dragCardIdx);
       } else if (char) {
         this._showNotEnoughElixir();
       }
@@ -516,6 +564,26 @@ export class BattleScene extends Phaser.Scene {
     this._buildDeployIndicator(ptr.x, ptr.y);
     this.myElixir = Math.max(0, this.myElixir - char.elixirCost);
     this.elixirSystem.update(this.myElixir, this.elixirRate || 1);
+    this._cycleCard(this.selectedCardIdx);
+  }
+
+  // ── 3…2…1…FIGHT! intro ─────────────────────────────────────────────────────
+  _battleCountdown() {
+    const { width: W, height: H } = this.scale;
+    const steps = ['3', '2', '1', 'FIGHT!'];
+    steps.forEach((s, i) => {
+      this.time.delayedCall(i * 650, () => {
+        const t = this.add.text(W / 2, H * 0.42, s, {
+          fontSize: s === 'FIGHT!' ? '58px' : '76px',
+          fill: s === 'FIGHT!' ? '#FFD700' : '#FFFFFF',
+          fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+          stroke: '#000000', strokeThickness: 10
+        }).setOrigin(0.5).setDepth(30).setScale(2.2).setAlpha(0);
+        this.tweens.add({ targets: t, alpha: 1, scaleX: 1, scaleY: 1, duration: 240, ease: 'Back.easeOut' });
+        this.tweens.add({ targets: t, alpha: 0, duration: 200, delay: 430, onComplete: () => t.destroy() });
+        if (s === 'FIGHT!') this.cameras.main.shake(150, 0.006);
+      });
+    });
   }
 
   _showNotEnoughElixir() {
@@ -842,7 +910,8 @@ export class BattleScene extends Phaser.Scene {
       }
 
       // ── Body transform ───────────────────────────────────────────────────
-      const lean = o.isSheet ? 0
+      if (o.isSheet && time > o.attackUntil && o.aimRot) o.aimRot *= 0.86; // relax aim
+      const lean = o.isSheet ? (o.aimRot || 0)
         : (isMoving && !o.isAir ? Math.sin(ph * 0.5) * 0.045 : Math.sin(ph) * 0.02);
       const bs = o.baseScale * depthSc;
       o.g.setPosition(bx, by + bob);
@@ -862,27 +931,38 @@ export class BattleScene extends Phaser.Scene {
     return (Math.round(r) << 16) | (Math.round(g) << 8) | Math.round(b);
   }
 
-  // Attacker leans toward its target, then springs back (lunge decays in update)
-  _lungeUnit(charId, fx, fy, tx, ty) {
-    let best = null, bestD = 40 * 40;
+  // Nearest displayed unit of a charId (attacker lookup for events)
+  _unitNear(charId, x, y, r = 110) {
+    let best = null, bestD = r * r;
     for (const id in this.unitGraphics) {
       const o = this.unitGraphics[id];
       if (o.charId !== charId) continue;
-      const d = (o.dispX - fx) ** 2 + (o.dispY - fy) ** 2;
+      const d = (o.dispX - x) ** 2 + (o.dispY - y) ** 2;
       if (d < bestD) { bestD = d; best = o; }
     }
+    return best;
+  }
+
+  // Attacker faces + tilts toward its target, lunges, and swings (real anim)
+  _lungeUnit(charId, fx, fy, tx, ty) {
+    const best = this._unitNear(charId, fx, fy);
     if (!best) return;
-    const dx = tx - fx, dy = ty - fy;
+    const dx = tx - best.dispX, dy = ty - best.dispY;
     const d = Math.hypot(dx, dy) || 1;
     best.lungeX = (dx / d) * 8;
     best.lungeY = (dy / d) * 8;
 
-    // Real attack animation (imported packs) — face the target, swing, resume
-    if (best.isSheet && this.anims.exists(`${best.charId}_attack`)) {
-      best.g.setFlipX(dx < 0);
-      const animObj = this.anims.get(`${best.charId}_attack`);
-      best.attackUntil = this.time.now + (animObj?.duration || 500);
-      best.g.play(`${best.charId}_attack`, true);
+    if (best.isSheet) {
+      // Face left/right toward the target...
+      if (Math.abs(dx) > 4) best.g.setFlipX(dx < 0);
+      // ...and pitch the body up/down so vertical shots read as aimed
+      const pitch = Phaser.Math.Clamp(Math.atan2(dy, Math.abs(dx)), -0.85, 0.85) * 0.55;
+      best.aimRot = (best.g.flipX ? -1 : 1) * pitch;
+      if (this.anims.exists(`${best.charId}_attack`)) {
+        const animObj = this.anims.get(`${best.charId}_attack`);
+        best.attackUntil = this.time.now + (animObj?.duration || 500);
+        best.g.play(`${best.charId}_attack`, true);
+      }
     }
   }
 
@@ -936,27 +1016,37 @@ export class BattleScene extends Phaser.Scene {
 
   _onGameEvent(evt) {
     if (evt.type === 'unit_hit' || evt.type === 'tower_hit') {
-      const fx = evt.fromX ?? evt.x, fy = evt.fromY ?? evt.y;
       const char = CHARACTERS[evt.charId];
       const range = char?.range ?? 80;
       const accent = char?.accentColor ?? char?.color ?? 0xFFFFFF;
 
-      // Fire the attacker's projectile / slash
+      // Aim at where things are DRAWN, not where the server says they were:
+      // attacker = nearest displayed unit of that charId, target = its live
+      // display position (falls back to server coords for towers).
+      const atk = this._unitNear(evt.charId, evt.fromX ?? evt.x, evt.fromY ?? evt.y);
+      const fx = atk ? atk.dispX : (evt.fromX ?? evt.x);
+      const fy = atk ? atk.dispY - 20 : (evt.fromY ?? evt.y);
+      const tgt0 = this.unitGraphics[evt.targetId];
+      const tx = tgt0 ? tgt0.dispX : evt.x;
+      const ty = tgt0 ? tgt0.dispY - 14 : evt.y;
+
+      // Fire the attacker's projectile / slash + lunge + facing
       if (evt.charId) {
-        this._playAttackFX(evt.charId, fx, fy, evt.x, evt.y);
-        // Attacker lunges toward the target
-        this._lungeUnit(evt.charId, fx, fy, evt.x, evt.y);
+        this._playAttackFX(evt.charId, fx, fy, tx, ty);
+        this._lungeUnit(evt.charId, fx, fy, tx, ty);
       }
 
-      // Compute how long the projectile takes to reach the target (ranged only)
-      const dist = Math.hypot(evt.x - fx, evt.y - fy);
+      // Projectile travel time (ranged only)
+      const dist = Math.hypot(tx - fx, ty - fy);
       const travel = range >= 130 ? Math.min(dist * 1.0, 380) : 0;
 
-      // Impact spark + damage number land together, AFTER the projectile arrives
+      // Impact spark + damage number land ON the target when the shot arrives
       this.time.delayedCall(travel, () => {
-        this._impactFlash(evt.x, evt.y, accent);
-        this._showDamageNumber(evt.x, evt.y, evt.damage);
-        this._knockbackTarget(evt.targetId, fx, fy, evt.x, evt.y, evt.damage);
+        const t2 = this.unitGraphics[evt.targetId];
+        const ix = t2 ? t2.dispX : tx, iy = t2 ? t2.dispY - 14 : ty;
+        this._impactFlash(ix, iy, accent);
+        this._showDamageNumber(ix, iy - 8, evt.damage);
+        this._knockbackTarget(evt.targetId, fx, fy, ix, iy, evt.damage);
         audioSystem.playHit();
       });
     }

@@ -38,8 +38,16 @@ app.get('/health', (_, res) => res.json({ status: 'ok', time: Date.now() }));
 // Serve built client in production
 if (process.env.NODE_ENV === 'production') {
   const clientDist = path.join(__dirname, '../client/dist');
-  app.use(express.static(clientDist));
-  app.get('*', (_, res) => res.sendFile(path.join(clientDist, 'index.html')));
+  // Hashed assets cache forever; index.html must NEVER be cached so players
+  // always get the newest bundle after a deploy.
+  app.use(express.static(clientDist, {
+    maxAge: '30d',
+    setHeaders: (res, p) => { if (p.endsWith('index.html')) res.setHeader('Cache-Control', 'no-store'); }
+  }));
+  app.get('*', (_, res) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.sendFile(path.join(clientDist, 'index.html'));
+  });
 }
 
 // ── Game ──────────────────────────────────────────────────────────────────────

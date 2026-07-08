@@ -52,6 +52,12 @@ export class MainMenuScene extends Phaser.Scene {
 
     this.cameras.main.fadeIn(400);
     audioSystem.playTrack('battle_hymn');
+    // Browsers keep AudioContext suspended until a user gesture — kick the
+    // music on the first tap so the home page always has sound.
+    this.input.once('pointerdown', () => {
+      audioSystem.resume();
+      if (!audioSystem.currentTrackName) audioSystem.playTrack('battle_hymn');
+    });
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -678,6 +684,11 @@ export class MainMenuScene extends Phaser.Scene {
       lastY = p.y;
     });
     scrollZone.on('pointerup', () => { lastY = null; });
+    // Desktop mouse-wheel scrolling
+    this.input.on('wheel', (_p, _o, _dx, dy) => {
+      if (this._activePanel !== 'shop') return;
+      list.y = Phaser.Math.Clamp(list.y - dy * 0.5, LIST_TOP - maxScroll, LIST_TOP);
+    });
     if (maxScroll > 0) {
       const hint = this.add.text(W / 2, PANEL_H - 16, '▾ scroll for more ▾', { fontSize: '10px', fill: '#5B6B9A', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(0.5);
       panel.add(hint);
@@ -690,54 +701,60 @@ export class MainMenuScene extends Phaser.Scene {
     const panel = this._makePanel(480);
     this._panels.stats = panel;
 
-    const title = this.add.text(W/2,32,'📊  STATS',{fontSize:'18px',fill:'#88CCFF',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5);
+    const title = this.add.text(W/2,30,'📊  BATTLE STATS',{fontSize:'22px',fill:'#88CCFF',fontFamily:'Arial Black, Arial',fontStyle:'bold',stroke:'#000',strokeThickness:3}).setOrigin(0.5);
     panel.add(title);
 
-    // Castle Level
-    const clBg = this.add.graphics();
-    clBg.fillStyle(0x0a1e30,0.9); clBg.fillRoundedRect(12,58,W-24,110,10);
-    clBg.lineStyle(2,0xFFD700,0.6); clBg.strokeRoundedRect(12,58,W-24,110,10);
-    const castleLvl = Number(localStorage.getItem('bb_castle_level') || 1);
-    const castleXp  = Number(localStorage.getItem('bb_castle_xp')    || 420);
-    const XP_TABLE  = [500,1500,4000,10000,25000,60000,150000,400000,Infinity];
-    const xpNeeded  = XP_TABLE[Math.min(castleLvl-1, XP_TABLE.length-1)];
-    const xpPct     = Math.min(castleXp / xpNeeded, 1);
+    // ── Hero header: trophy count + win-rate donut ───────────────────────────
+    const hd = this.add.graphics();
+    hd.fillGradientStyle(0x2a3f7a, 0x2a3f7a, 0x14204a, 0x14204a, 1);
+    hd.fillRoundedRect(12, 54, W-24, 118, 14);
+    hd.lineStyle(2, 0xFFD700, 0.55); hd.strokeRoundedRect(12, 54, W-24, 118, 14);
+    hd.fillStyle(0xFFFFFF, 0.06); hd.fillRoundedRect(15, 57, W-30, 40, 11);
+    // trophy block (left)
+    const tIcon = this.add.text(46, 96, '🏆', { fontSize: '34px' }).setOrigin(0.5);
+    const tNum  = this.add.text(76, 84, this.trophies.toLocaleString(), { fontSize:'30px', fill:'#FFD700', fontFamily:'Arial Black, Arial', fontStyle:'bold', stroke:'#000', strokeThickness:3 });
+    const tLbl  = this.add.text(78, 118, 'TROPHIES  ·  GOLD LEAGUE', { fontSize:'10px', fill:'#C9B577', fontFamily:'Arial', fontStyle:'bold', letterSpacing:1 });
+    const tBest = this.add.text(78, 138, 'Season best: 1,480   ·   Rank #847 (Top 12%)', { fontSize:'11px', fill:'#8FA4D8', fontFamily:'Arial' });
+    // win-rate donut (right)
+    const dX = W-72, dY = 113, R = 34, winPct = 0.62;
+    const donut = this.add.graphics();
+    donut.lineStyle(11, 0x1a2440, 1); donut.beginPath(); donut.arc(dX, dY, R, 0, Math.PI*2); donut.strokePath();
+    donut.lineStyle(11, 0x44FF88, 1); donut.beginPath();
+    donut.arc(dX, dY, R, -Math.PI/2, -Math.PI/2 + Math.PI*2*winPct); donut.strokePath();
+    const dTxt = this.add.text(dX, dY-6, '62%', { fontSize:'17px', fill:'#44FF88', fontFamily:'Arial Black, Arial', fontStyle:'bold' }).setOrigin(0.5);
+    const dLbl = this.add.text(dX, dY+12, 'WIN RATE', { fontSize:'8px', fill:'#7A93C4', fontFamily:'Arial', fontStyle:'bold' }).setOrigin(0.5);
+    panel.add([hd, tIcon, tNum, tLbl, tBest, donut, dTxt, dLbl]);
 
-    const clTitle = this.add.text(W/2,74,'CASTLE LEVEL',{fontSize:'12px',fill:'#FFD700',fontFamily:'Arial',letterSpacing:2}).setOrigin(0.5);
-    const clNum = this.add.text(W/2,105,String(castleLvl),{fontSize:'52px',fill:'#FFFFFF',fontFamily:'Arial Black',fontStyle:'bold',stroke:'#FFD700',strokeThickness:3}).setOrigin(0.5);
-    const clSub = this.add.text(W/2,140,castleXp.toLocaleString()+' / '+xpNeeded.toLocaleString()+' XP to Level '+(castleLvl+1),{fontSize:'11px',fill:'#8899AA',fontFamily:'Arial'}).setOrigin(0.5);
-    // XP progress bar
-    const xpBg = this.add.graphics();
-    xpBg.fillStyle(0x1a1a2e); xpBg.fillRoundedRect(28,150,W-56,14,5);
-    xpBg.fillStyle(0xFFD700,0.9); xpBg.fillRoundedRect(28,150,(W-56)*xpPct,14,5);
-    if (xpPct > 0.04) { xpBg.fillStyle(0xFFFFFF,0.25); xpBg.fillRoundedRect(28,150,(W-56)*xpPct*0.45,7,4); }
-    const xpPctLabel = this.add.text(W-32,156,Math.round(xpPct*100)+'%',{fontSize:'9px',fill:'#FFD700',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(1,0.5);
-    panel.add([clBg,clTitle,clNum,clSub,xpBg,xpPctLabel]);
-
-    // Battle stats grid
-    const stats = [
-      ['Total Battles','204'],['Win Rate','62%'],
-      ['Trophies','1,219'],['Best Season','1,480'],
-      ['Crowns Earned','586'],['Fav. Character','Titan Grunt'],
+    // ── Colorful stat tiles ──────────────────────────────────────────────────
+    const tiles = [
+      ['⚔️','Battles','204',0x3366CC], ['👑','Crowns','586',0xD9A21B],
+      ['🔥','Best Streak','8 wins',0xE05C2A], ['🛡️','Towers Broken','311',0x2E9E6B],
+      ['⭐','Fav. Character','Titan Grunt',0x9B59B6], ['⏱️','Avg. Battle','2:41',0x2E86AB],
     ];
-    stats.forEach(([label,val],i) => {
-      const row=Math.floor(i/2), col=i%2;
-      const x=12+col*(W/2-4), y=178+row*60;
-      const sbg=this.add.graphics();
-      sbg.fillStyle(0x0a1e14,0.8); sbg.fillRoundedRect(x,y,(W-24)/2,50,8);
-      sbg.lineStyle(1,0x2a4a3a,0.5); sbg.strokeRoundedRect(x,y,(W-24)/2,50,8);
-      const lbl=this.add.text(x+(W-24)/4,y+10,label,{fontSize:'9px',fill:'#667788',fontFamily:'Arial'}).setOrigin(0.5);
-      const valtxt=this.add.text(x+(W-24)/4,y+30,val,{fontSize:'16px',fill:'#FFFFFF',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5);
-      panel.add([sbg,lbl,valtxt]);
+    tiles.forEach(([ic,label,val,col],i) => {
+      const row=Math.floor(i/2), c=i%2;
+      const x=12+c*((W-24)/2+4), y=184+row*66, tw=(W-28)/2, th=58;
+      const g=this.add.graphics();
+      g.fillStyle(0x0d1730,0.95); g.fillRoundedRect(x,y,tw,th,10);
+      g.fillStyle(col,0.20); g.fillRoundedRect(x,y,tw,th,10);
+      g.fillStyle(col,0.9);  g.fillRoundedRect(x,y,5,th,{tl:10,bl:10,tr:0,br:0});
+      g.lineStyle(1.5,col,0.7); g.strokeRoundedRect(x,y,tw,th,10);
+      const icon=this.add.text(x+22,y+th/2,ic,{fontSize:'20px'}).setOrigin(0.5);
+      const lbl=this.add.text(x+42,y+10,label,{fontSize:'10px',fill:'#9FB2D8',fontFamily:'Arial',fontStyle:'bold'});
+      const v=this.add.text(x+42,y+26,val,{fontSize:'16px',fill:'#FFFFFF',fontFamily:'Arial Black, Arial',fontStyle:'bold'});
+      panel.add([g,icon,lbl,v]);
     });
 
-    // Season leaderboard note
-    const rkBg = this.add.graphics();
-    rkBg.fillStyle(0x4a2a00,0.8); rkBg.fillRoundedRect(12,358,W-24,54,8);
-    rkBg.lineStyle(1,0xFFD700,0.4); rkBg.strokeRoundedRect(12,358,W-24,54,8);
-    const rkLabel = this.add.text(W/2,376,'🏆  Season 1 Rank: #847',{fontSize:'15px',fill:'#FFD700',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5);
-    const rkSub = this.add.text(W/2,398,'Top 12% — Gold League',{fontSize:'11px',fill:'#CC8800',fontFamily:'Arial'}).setOrigin(0.5);
-    panel.add([title,rkBg,rkLabel,rkSub]);
+    // ── Season banner ────────────────────────────────────────────────────────
+    let sb;
+    if (this.textures.exists('ribbon_yellow')) {
+      sb = this.add.image(W/2, 316+96+8, 'ribbon_yellow').setDisplaySize(W-40, 44);
+    } else {
+      sb = this.add.graphics();
+      sb.fillStyle(0x4a2a00,0.9); sb.fillRoundedRect(16,398,W-32,40,10);
+    }
+    const sTxt = this.add.text(W/2, 316+96+5, '🏆 SEASON 1 — ends in 12 days', { fontSize:'13px', fill:'#5A3400', fontFamily:'Arial Black, Arial', fontStyle:'bold' }).setOrigin(0.5);
+    panel.add([sb, sTxt]);
   }
 
   // ── SETTINGS PANEL ────────────────────────────────────────────────────────

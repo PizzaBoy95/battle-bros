@@ -14,6 +14,7 @@ const config = {
   parent: document.body,
   backgroundColor: '#03070e',
   dom: { createContainer: true },
+  render: { antialias: true, roundPixels: true },   // stops sub-pixel shimmer
   scale: {
     mode: Phaser.Scale.FIT,
     autoCenter: Phaser.Scale.CENTER_BOTH,

@@ -70,6 +70,11 @@ export class BattleTimer {
       this._drawBg(0x0a0a1a, low ? 0xFF4444 : 0x2a2a5a);
       this.text.setStyle({ fill: low ? '#FF6B6B' : '#FFFFFF' });
       this.phaseLabel.setText('');
+      // Heartbeat pulse in the final 10 seconds
+      if (totalSec <= 10 && this._lastPulse !== totalSec) {
+        this._lastPulse = totalSec;
+        this.scene.tweens.add({ targets: this.text, scaleX: 1.25, scaleY: 1.25, duration: 130, yoyo: true });
+      }
     }
   }
 
