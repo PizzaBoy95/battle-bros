@@ -20,6 +20,10 @@ class AudioSystem {
       this.masterGain = this.ctx.createGain();
       this.masterGain.gain.value = this.volume;
       this.masterGain.connect(this.ctx.destination);
+      // All MUSIC routes through this bus so stopMusic() can cut scheduled
+      // notes instantly (SFX stay on masterGain).
+      this.musicBus = this.ctx.createGain();
+      this.musicBus.connect(this.masterGain);
       this.reverbNode = this._buildReverb(2.2, 0.3);
     } catch (e) { console.warn('[Audio] unavailable', e); }
   }
@@ -62,7 +66,7 @@ class AudioSystem {
     gain.gain.setValueAtTime(vol, start + dur - rel);
     gain.gain.linearRampToValueAtTime(0, start + dur);
     osc.connect(gain);
-    gain.connect(this.masterGain);
+    gain.connect(this._musicMode && this.musicBus ? this.musicBus : this.masterGain);
     if (wet && this.reverbNode) gain.connect(this.reverbNode);
     osc.start(start);
     osc.stop(start + dur + 0.02);
@@ -81,7 +85,8 @@ class AudioSystem {
     const gain = this.ctx.createGain();
     gain.gain.setValueAtTime(vol, start);
     gain.gain.linearRampToValueAtTime(0, start + dur * 0.4);
-    src.connect(flt); flt.connect(gain); gain.connect(this.masterGain);
+    src.connect(flt); flt.connect(gain);
+    gain.connect(this._musicMode && this.musicBus ? this.musicBus : this.masterGain);
     src.start(start); src.stop(start + dur);
   }
 
@@ -89,6 +94,7 @@ class AudioSystem {
   // D major pentatonic: D F# A B  (always harmonious, gentle)
   _playBattleHymn() {
     if (!this.musicEnabled || !this.ctx) return;
+    this._musicMode = true;
     const now = this.ctx.currentTime + 0.05;
     const Q   = 60 / 76 / 2;   // eighth note @ 76 BPM
 
@@ -139,7 +145,7 @@ class AudioSystem {
         gain.gain.linearRampToValueAtTime(0.022, tp + padDur * 0.4);
         gain.gain.linearRampToValueAtTime(0, tp + padDur);
         osc.connect(gain);
-        gain.connect(this.masterGain);
+        gain.connect(this.musicBus || this.masterGain);
         if (this.reverbNode) gain.connect(this.reverbNode);
         osc.start(tp); osc.stop(tp + padDur + 0.1);
       }
@@ -150,11 +156,13 @@ class AudioSystem {
     this.intervals.push(setTimeout(() => {
       if (this.currentTrackName === 'battle_hymn') this._playBattleHymn();
     }, total * 1000));
+    this._musicMode = false;
   }
 
   // ── TRACK 2: Ember Rush — A minor pentatonic, 138 BPM, energetic ─────────
   _playEmberRush() {
     if (!this.musicEnabled || !this.ctx) return;
+    this._musicMode = true;
     const now  = this.ctx.currentTime + 0.05;
     const Q    = 60 / 138 / 2;
 
@@ -189,7 +197,7 @@ class AudioSystem {
         osc2.frequency.linearRampToValueAtTime(40, now + i*Q + 0.1);
         g2.gain.setValueAtTime(0.22, now + i*Q);
         g2.gain.linearRampToValueAtTime(0, now + i*Q + 0.1);
-        osc2.connect(g2); g2.connect(this.masterGain);
+        osc2.connect(g2); g2.connect(this.musicBus || this.masterGain);
         osc2.start(now + i*Q); osc2.stop(now + i*Q + 0.12);
       }
       if (i % 8 === 4) this._noise(0.12, now + i*Q, 0.06, 2800);
@@ -200,11 +208,13 @@ class AudioSystem {
     this.intervals.push(setTimeout(() => {
       if (this.currentTrackName === 'ember_rush') this._playEmberRush();
     }, total * 1000));
+    this._musicMode = false;
   }
 
   // ── TRACK 3: Frost Crown — D minor pentatonic, 124 BPM, atmospheric ───────
   _playFrostCrown(overtime = false) {
     if (!this.musicEnabled || !this.ctx) return;
+    this._musicMode = true;
     const now = this.ctx.currentTime + 0.05;
     const Q   = 60 / (overtime ? 148 : 124) / 2;
 
@@ -243,6 +253,7 @@ class AudioSystem {
       if (this.currentTrackName === 'frost_crown' || this.currentTrackName === 'frost_crown_overtime')
         this._playFrostCrown(overtime || this.currentTrackName === 'frost_crown_overtime');
     }, total * 1000));
+    this._musicMode = false;
   }
 
   // ── Public track API ──────────────────────────────────────────────────────
@@ -262,6 +273,12 @@ class AudioSystem {
     this.currentTrackName = null;
     this.intervals.forEach(clearTimeout);
     this.intervals = [];
+    // Kill every already-scheduled music note instantly (no more overlap)
+    if (this.ctx && this.musicBus) {
+      try { this.musicBus.disconnect(); } catch { /* already disconnected */ }
+      this.musicBus = this.ctx.createGain();
+      this.musicBus.connect(this.masterGain);
+    }
   }
 
   // ── Sound Effects ─────────────────────────────────────────────────────────

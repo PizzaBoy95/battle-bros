@@ -25,11 +25,14 @@ export class LootBoxScene extends Phaser.Scene {
     const { width: W, height: H } = this.scale;
     const rarityData = RARITIES[this.reward.rarity] || RARITIES.common;
     this.rarityCol   = rarityData.color;
+    // Common's grey reads dull — FX always use a vibrant color (gold for common)
+    this.fxCol = this.reward.rarity === 'common' ? 0xFFC94D : this.rarityCol;
 
-    // ── Background ────────────────────────────────────────────────────────────
+    // ── Background — rich vault purple, spotlight on the chest ───────────────
     const bg = this.add.graphics();
-    bg.fillGradientStyle(0x030310, 0x030310, 0x08071a, 0x060515, 1);
+    bg.fillGradientStyle(0x1b1038, 0x1b1038, 0x0a0618, 0x120a26, 1);
     bg.fillRect(0, 0, W, H);
+    bg.fillStyle(this.fxCol, 0.05); bg.fillEllipse(W / 2, H * 0.38, 420, 420);
     this._drawStars();
 
     // Ambient rarity glow on floor
@@ -60,15 +63,15 @@ export class LootBoxScene extends Phaser.Scene {
     for (let i = 0; i < 12; i++) {
       const a = (i / 12) * Math.PI * 2;
       const len = i % 2 === 0 ? 190 : 130;
-      this.raysG.fillStyle(this.rarityCol, i % 2 === 0 ? 0.10 : 0.06);
+      this.raysG.fillStyle(this.fxCol, i % 2 === 0 ? 0.22 : 0.12);
       this.raysG.fillTriangle(0, 0,
         Math.cos(a - 0.10) * len, Math.sin(a - 0.10) * len,
         Math.cos(a + 0.10) * len, Math.sin(a + 0.10) * len);
     }
     this.tweens.add({ targets: this.raysG, angle: 360, duration: 20000, repeat: -1, ease: 'Linear' });
     const aura = this.add.graphics().setDepth(2);
-    aura.fillStyle(this.rarityCol, 0.16); aura.fillCircle(W / 2, H * 0.38, 96);
-    aura.fillStyle(this.rarityCol, 0.10); aura.fillCircle(W / 2, H * 0.38, 130);
+    aura.fillStyle(this.fxCol, 0.22); aura.fillCircle(W / 2, H * 0.38, 110);
+    aura.fillStyle(this.fxCol, 0.12); aura.fillCircle(W / 2, H * 0.38, 150);
     this.tweens.add({ targets: aura, alpha: 0.45, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
 
     // Drifting sparkles around the chest
@@ -81,7 +84,7 @@ export class LootBoxScene extends Phaser.Scene {
     }});
 
     // ── Chest ─────────────────────────────────────────────────────────────────
-    this.chestContainer = this.add.container(W / 2, H * 0.38).setDepth(5);
+    this.chestContainer = this.add.container(W / 2, H * 0.38).setDepth(5).setScale(1.35);
     this.boxG  = this.add.graphics();
     this.lidG  = this.add.graphics();
     this.lockG = this.add.graphics();
@@ -144,9 +147,9 @@ export class LootBoxScene extends Phaser.Scene {
     this.boxG.fillStyle(0x5A2E10, 0.7);
     this.boxG.fillRoundedRect(-BW / 2 + 4, 4, BW - 8, BH - 8, { bl: 8, br: 8, tl: 0, tr: 0 });
     // Metal band
-    this.boxG.fillStyle(0x888888);
+    this.boxG.fillStyle(0xD9A21B);
     this.boxG.fillRect(-BW / 2, BH * 0.38, BW, 10);
-    this.boxG.fillStyle(0xBBBBBB, 0.5);
+    this.boxG.fillStyle(0xFFE9A0, 0.6);
     this.boxG.fillRect(-BW / 2 + 2, BH * 0.38 + 1, BW - 4, 4);
     // Rarity accent strips
     this.boxG.fillStyle(col, 0.55);
@@ -154,7 +157,7 @@ export class LootBoxScene extends Phaser.Scene {
     this.boxG.fillRect(-BW / 2, BH * 0.38 + 7, BW, 3);
     // Corner studs
     [[- BW / 2 + 6, 6], [BW / 2 - 14, 6], [-BW / 2 + 6, BH - 14], [BW / 2 - 14, BH - 14]].forEach(([sx, sy]) => {
-      this.boxG.fillStyle(0xBBBBBB); this.boxG.fillRect(sx, sy, 8, 8);
+      this.boxG.fillStyle(0xD9A21B); this.boxG.fillRect(sx, sy, 8, 8);
       this.boxG.fillStyle(0xFFFFFF, 0.3); this.boxG.fillRect(sx + 1, sy + 1, 3, 3);
     });
     // Body border
@@ -168,9 +171,9 @@ export class LootBoxScene extends Phaser.Scene {
     this.lidG.fillStyle(0x6A3518, 0.7);
     this.lidG.fillRoundedRect(-BW / 2 + 4, lidY - LH + 4, BW - 8, LH - 6, { tl: 8, tr: 8, bl: 0, br: 0 });
     // Lid metal band
-    this.lidG.fillStyle(0x999999);
+    this.lidG.fillStyle(0xD9A21B);
     this.lidG.fillRect(-BW / 2, lidY - 6, BW, 8);
-    this.lidG.fillStyle(0xCCCCCC, 0.4);
+    this.lidG.fillStyle(0xFFE9A0, 0.5);
     this.lidG.fillRect(-BW / 2 + 2, lidY - 5, BW - 4, 3);
     this.lidG.fillStyle(col, 0.55);
     this.lidG.fillRect(-BW / 2, lidY - 6, BW, 3);
@@ -179,11 +182,11 @@ export class LootBoxScene extends Phaser.Scene {
     this.lidG.strokeRoundedRect(-BW / 2, lidY - LH, BW, LH + 4, { tl: 10, tr: 10, bl: 0, br: 0 });
 
     // ── Padlock (front center) ─────────────────────────────────────────────────
-    this.lockG.fillStyle(0xAAAAAA);
+    this.lockG.fillStyle(0xE8B62A);
     this.lockG.fillRoundedRect(-14, -10, 28, 22, 5);
-    this.lockG.fillStyle(0xCCCCCC, 0.4);
+    this.lockG.fillStyle(0xFFE9A0, 0.5);
     this.lockG.fillRoundedRect(-12, -8, 12, 8, 3);
-    this.lockG.lineStyle(5.5, 0xAAAAAA);
+    this.lockG.lineStyle(5.5, 0xE8B62A);
     this.lockG.beginPath(); this.lockG.arc(0, -10, 10, Math.PI, 0, false); this.lockG.strokePath();
     this.lockG.fillStyle(0x666666); this.lockG.fillCircle(0, -1, 5);
     this.lockG.fillRect(-1.5, -1, 3, 8);
@@ -261,18 +264,31 @@ export class LootBoxScene extends Phaser.Scene {
     this._drawProgress(1);
     this.clickLabel.setText('UNLOCKED!').setStyle({ fill: '#44FF88' });
     this.instructionText.setVisible(false);
+    // Hide locked-phase chrome so the reveal screen is clean
+    this.time.delayedCall(600, () => {
+      this.clickLabel.setVisible(false);
+      this.progressFill.setVisible(false);
+      this.children.list.forEach(o => { if (o.text === '[ SKIP ]') o.setVisible(false); });
+    });
 
     audioSystem.playLootOpen?.();
+
+    // White screen flash + camera shake — the "pop"
+    const { width: FW, height: FH } = this.scale;
+    const flash = this.add.rectangle(FW / 2, FH / 2, FW, FH, 0xFFFFFF, 0.85).setDepth(30);
+    this.tweens.add({ targets: flash, alpha: 0, duration: 380, onComplete: () => flash.destroy() });
+    this.cameras.main.shake(180, 0.012);
 
     // Blast the chest open
     this.tweens.add({
       targets: this.chestContainer,
-      scaleX: 1.18, scaleY: 1.18, y: `-=12`,
-      duration: 120, yoyo: true, ease: 'Back.easeOut',
+      scaleX: 1.6, scaleY: 1.6, y: `-=16`,
+      duration: 130, yoyo: true, ease: 'Back.easeOut',
       onComplete: () => {
+        this._coinBurst(this.chestContainer.x, this.chestContainer.y);
         this.tweens.add({
           targets: this.chestContainer,
-          alpha: 0, scaleX: 0.5, scaleY: 0.5,
+          alpha: 0, scaleX: 0.6, scaleY: 0.6,
           duration: 300, ease: 'Power2',
           onComplete: () => this._reveal()
         });
@@ -315,16 +331,35 @@ export class LootBoxScene extends Phaser.Scene {
       this.tweens.add({ targets: goldText, alpha: 1, y: goldText.y - 8, duration: 380, ease: 'Sine.easeOut' });
     });
 
-    // Character card reward
+    // Character card reward — a real physical card with the hero's portrait
     if (this.reward.charReward) {
-      const cardBg = this.add.graphics().setDepth(14);
-      cardBg.fillStyle(col, 0.18); cardBg.fillRoundedRect(W / 2 - 120, H * 0.54, 240, 38, 8);
-      cardBg.lineStyle(1.5, col, 0.6); cardBg.strokeRoundedRect(W / 2 - 120, H * 0.54, 240, 38, 8);
-      const charText = this.add.text(W / 2, H * 0.54 + 19,
-        `🃏  ${this.reward.charReward.replace(/_/g, ' ').toUpperCase()}  CARD`, {
-          fontSize: '14px', fill: colH, fontFamily: 'Arial', fontStyle: 'bold'
-        }).setOrigin(0.5).setAlpha(0).setDepth(15);
-      this.time.delayedCall(480, () => { this.tweens.add({ targets: [cardBg, charText], alpha: 1, duration: 350 }); });
+      const id = this.reward.charReward;
+      const cy = H * 0.51, cw = 84, ch = 104;
+      const card = this.add.container(W / 2, cy).setDepth(15).setAlpha(0).setScale(0.3);
+      const cbg = this.add.graphics();
+      cbg.fillStyle(0x0d1428, 1); cbg.fillRoundedRect(-cw / 2, -ch / 2, cw, ch, 10);
+      cbg.fillStyle(col, 0.25);   cbg.fillRoundedRect(-cw / 2, -ch / 2, cw, ch, 10);
+      cbg.lineStyle(3, col, 1);   cbg.strokeRoundedRect(-cw / 2, -ch / 2, cw, ch, 10);
+      card.add(cbg);
+      const pKey = cardTexKey(this, id);
+      if (pKey) {
+        const img = this.add.image(0, -8, pKey);
+        const src = this.textures.get(pKey).getSourceImage();
+        const s = Math.min((cw - 14) / src.width, (ch - 34) / src.height);
+        img.setDisplaySize(src.width * s, src.height * s);
+        card.add(img);
+      }
+      card.add(this.add.text(0, ch / 2 - 12, CHARACTERS[id]?.name || id, {
+        fontSize: '10px', fill: '#FFFFFF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+      }).setOrigin(0.5));
+      const newTag = this.add.text(W / 2 + cw / 2 - 4, cy - ch / 2 + 4, '+1', {
+        fontSize: '14px', fill: '#44FF88', fontFamily: 'Arial Black, Arial', fontStyle: 'bold', stroke: '#000', strokeThickness: 3
+      }).setOrigin(0.5).setAlpha(0).setDepth(16);
+      this.time.delayedCall(430, () => {
+        this.tweens.add({ targets: card, alpha: 1, scaleX: 1, scaleY: 1, duration: 420, ease: 'Back.easeOut' });
+        this.tweens.add({ targets: newTag, alpha: 1, duration: 300, delay: 300 });
+        this.tweens.add({ targets: card, angle: 3, duration: 1400, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 500 });
+      });
     }
 
     this._claimReward();
@@ -359,6 +394,30 @@ export class LootBoxScene extends Phaser.Scene {
     });
   }
 
+  // Physical gold coins erupting from the chest
+  _coinBurst(x, y) {
+    for (let i = 0; i < 16; i++) {
+      const coin = this.add.container(x, y - 20).setDepth(20);
+      const g = this.add.graphics();
+      g.fillStyle(0x8A5E00); g.fillCircle(0, 1.5, 8);
+      g.fillStyle(0xFFC94D); g.fillCircle(0, 0, 8);
+      g.fillStyle(0xFFE9A0); g.fillCircle(-2.5, -2.5, 3);
+      g.lineStyle(1.5, 0xB8860B, 0.9); g.strokeCircle(0, 0, 8);
+      coin.add(g);
+      const dx = (Math.random() - 0.5) * 260;
+      const peak = 60 + Math.random() * 110;
+      const dur = 620 + Math.random() * 300;
+      this.tweens.add({ targets: coin, x: x + dx, duration: dur, ease: 'Linear' });
+      this.tweens.add({ targets: coin, y: y - 20 - peak, duration: dur * 0.42, ease: 'Quad.easeOut',
+        onComplete: () => this.tweens.add({
+          targets: coin, y: y + 120 + Math.random() * 60, duration: dur * 0.58, ease: 'Quad.easeIn',
+          onComplete: () => this.tweens.add({ targets: coin, alpha: 0, duration: 200, onComplete: () => coin.destroy() })
+        })
+      });
+      this.tweens.add({ targets: coin, scaleX: 0.25, duration: 180, yoyo: true, repeat: Math.ceil(dur / 360), ease: 'Sine.easeInOut' });
+    }
+  }
+
   // Deck characters' level-up progress (how close each is to the next level)
   async _showXpPanel() {
     const { width: W, height: H } = this.scale;
@@ -372,7 +431,7 @@ export class LootBoxScene extends Phaser.Scene {
     const deck = (this.registry.get('deck') || []).slice(0, 7);
     if (!deck.length) return;
 
-    const panelY = H * 0.60, rowH = 40, colW = (W - 48) / 2;
+    const panelY = H * 0.625, rowH = 40, colW = (W - 48) / 2;
     const pg = this.add.graphics().setDepth(14).setAlpha(0);
     pg.fillStyle(0x0a1024, 0.92);
     pg.fillRoundedRect(16, panelY - 14, W - 32, Math.ceil(deck.length / 2) * rowH + 46, 12);

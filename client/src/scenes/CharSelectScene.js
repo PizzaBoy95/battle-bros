@@ -531,7 +531,7 @@ export class CharSelectScene extends Phaser.Scene {
   // ── Character detail modal ──────────────────────────────────────────────────
   _buildInfoPanel() {
     const { W, H } = this;
-    const PW = 348, PH = 452;
+    const PW = Math.min(448, W - 24), PH = Math.min(660, H - 90);
 
     // Dim backdrop (tap outside to close)
     this.infoBackdrop = this.add.rectangle(W / 2, H / 2, W, H, 0x000000, 0.65)
@@ -548,15 +548,15 @@ export class CharSelectScene extends Phaser.Scene {
     this._infoPortrait = null;
 
     // Header texts
-    this.infoName = this.add.text(-PW / 2 + 110, -PH / 2 + 22, '', {
-      fontSize: '20px', fill: '#FFD700', fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
-      stroke: '#000', strokeThickness: 3
+    this.infoName = this.add.text(-PW / 2 + 152, -PH / 2 + 28, '', {
+      fontSize: '27px', fill: '#FFD700', fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 4
     }).setOrigin(0, 0);
-    this.infoRar = this.add.text(-PW / 2 + 110, -PH / 2 + 50, '', {
-      fontSize: '12px', fill: '#8899CC', fontFamily: 'Arial', fontStyle: 'bold'
+    this.infoRar = this.add.text(-PW / 2 + 152, -PH / 2 + 66, '', {
+      fontSize: '16px', fill: '#8899CC', fontFamily: 'Arial', fontStyle: 'bold'
     }).setOrigin(0, 0);
-    this.infoType = this.add.text(-PW / 2 + 110, -PH / 2 + 70, '', {
-      fontSize: '11px', fill: '#AAB4DD', fontFamily: 'Arial'
+    this.infoType = this.add.text(-PW / 2 + 152, -PH / 2 + 92, '', {
+      fontSize: '14px', fill: '#AAB4DD', fontFamily: 'Arial'
     }).setOrigin(0, 0);
 
     // Stat bars (redrawn per character)
@@ -565,16 +565,16 @@ export class CharSelectScene extends Phaser.Scene {
     this._infoStatLabels = [];
 
     // Special / description
-    this.infoSpec = this.add.text(0, PH / 2 - 120, '', {
-      fontSize: '11px', fill: '#C9B8FF', fontFamily: 'Arial', fontStyle: 'bold',
-      wordWrap: { width: PW - 36 }, align: 'center'
+    this.infoSpec = this.add.text(0, PH / 2 - 152, '', {
+      fontSize: '14px', fill: '#C9B8FF', fontFamily: 'Arial', fontStyle: 'bold',
+      wordWrap: { width: PW - 44 }, align: 'center'
     }).setOrigin(0.5, 0);
 
     // Toggle (add/remove) button
     this.infoBtnBg = this.add.graphics();
-    this.infoBtnTxt = this.add.text(0, PH / 2 - 40, '', {
-      fontSize: '16px', fill: '#FFFFFF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
-      stroke: '#000', strokeThickness: 3
+    this.infoBtnTxt = this.add.text(0, PH / 2 - 48, '', {
+      fontSize: '20px', fill: '#FFFFFF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+      stroke: '#000', strokeThickness: 4
     }).setOrigin(0.5).setInteractive({ useHandCursor: true });
     this.infoBtnTxt.on('pointerdown', () => {
       if (!this._infoCharId) return;
@@ -618,28 +618,28 @@ export class CharSelectScene extends Phaser.Scene {
     this.infoBg.fillStyle(0x0a0a1e, 0.98);
     this.infoBg.fillRoundedRect(-PW / 2, -PH / 2, PW, PH, 16);
     this.infoBg.fillStyle(rc, 0.10);
-    this.infoBg.fillRoundedRect(-PW / 2, -PH / 2, PW, 96, { tl: 16, tr: 16, bl: 0, br: 0 });
+    this.infoBg.fillRoundedRect(-PW / 2, -PH / 2, PW, 150, { tl: 16, tr: 16, bl: 0, br: 0 });
     this.infoBg.lineStyle(3, rc, 0.95);
     this.infoBg.strokeRoundedRect(-PW / 2, -PH / 2, PW, PH, 16);
     // Portrait frame
     this.infoBg.fillStyle(0x05050f, 1);
-    this.infoBg.fillRoundedRect(-PW / 2 + 14, -PH / 2 + 14, 84, 84, 10);
-    this.infoBg.lineStyle(2, rc, 0.8);
-    this.infoBg.strokeRoundedRect(-PW / 2 + 14, -PH / 2 + 14, 84, 84, 10);
+    this.infoBg.fillRoundedRect(-PW / 2 + 16, -PH / 2 + 16, 124, 124, 12);
+    this.infoBg.lineStyle(2.5, rc, 0.85);
+    this.infoBg.strokeRoundedRect(-PW / 2 + 16, -PH / 2 + 16, 124, 124, 12);
 
     // ── Portrait ──────────────────────────────────────────────────────────────
     if (this._infoPortrait) { this._infoPortrait.destroy(); this._infoPortrait = null; }
-    const px = -PW / 2 + 56, py = -PH / 2 + 56;
+    const px = -PW / 2 + 78, py = -PH / 2 + 78;
     const tKey = cardTexKey(this, charId);
     if (tKey) {
       const fill = tKey === charId + '_p';
-      this._infoPortrait = placeHero(this, px, py, tKey, 78, 78, { fill });
+      this._infoPortrait = placeHero(this, px, py, tKey, 114, 114, { fill });
     } else {
       this._infoPortrait = this.add.graphics();
       this._infoPortrait.x = px; this._infoPortrait.y = py + 18;
       const fn = DRAW_FUNCS[charId];
       if (fn) fn(this._infoPortrait);
-      this._infoPortrait.setScale(0.6);
+      this._infoPortrait.setScale(0.85);
     }
     this.infoPanel.add(this._infoPortrait);
     this.infoPanel.bringToTop(this.infoName);
@@ -665,28 +665,30 @@ export class CharSelectScene extends Phaser.Scene {
     for (const t of this._infoStatLabels) t.destroy();
     this._infoStatLabels = [];
 
-    const barX = -PW / 2 + 22, barW = PW - 130;
-    let yy = -PH / 2 + 116;
-    const rowH = 30;
+    const barX = -PW / 2 + 26, barW = PW - 52;
+    let yy = -PH / 2 + 168;
+    const rowH = 52;
     for (const [label, val, disp, max, col] of rows) {
       // Label
       const lblT = this.add.text(barX, yy - 2, label, {
-        fontSize: '11px', fill: '#9AA6D0', fontFamily: 'Arial', fontStyle: 'bold'
+        fontSize: '16px', fill: '#B9C4E8', fontFamily: 'Arial', fontStyle: 'bold'
       }).setOrigin(0, 0);
       // Value text (right side)
-      const valT = this.add.text(PW / 2 - 16, yy - 2, disp, {
-        fontSize: '11px', fill: '#FFFFFF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+      const valT = this.add.text(PW / 2 - 26, yy - 2, disp, {
+        fontSize: '16px', fill: '#FFFFFF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
       }).setOrigin(1, 0);
       this.infoPanel.add([lblT, valT]);
       this._infoStatLabels.push(lblT, valT);
 
       // Bar track + fill
-      const by = yy + 14;
+      const by = yy + 24;
       this.infoBars.fillStyle(0x1a1a30, 1);
-      this.infoBars.fillRoundedRect(barX, by, barW, 7, 3);
+      this.infoBars.fillRoundedRect(barX, by, barW, 13, 6);
       const frac = Phaser.Math.Clamp(val / max, 0.04, 1);
       this.infoBars.fillStyle(col, 0.95);
-      this.infoBars.fillRoundedRect(barX, by, barW * frac, 7, 3);
+      this.infoBars.fillRoundedRect(barX, by, barW * frac, 13, 6);
+      this.infoBars.fillStyle(0xFFFFFF, 0.18);
+      this.infoBars.fillRoundedRect(barX + 2, by + 2, Math.max(4, barW * frac - 4), 5, 3);
       yy += rowH;
     }
 
@@ -695,7 +697,7 @@ export class CharSelectScene extends Phaser.Scene {
 
     // ── Add / Remove button ───────────────────────────────────────────────────
     const inDeck = this.selectedDeck.includes(charId);
-    const bw = 260, bh = 42, bx = -bw / 2, byb = PH / 2 - 40 - bh / 2;
+    const bw = Math.min(360, PW - 60), bh = 58, bx = -bw / 2, byb = PH / 2 - 48 - bh / 2;
     const btnCol = inDeck ? 0x992222 : 0x227744;
     const btnBdr = inDeck ? 0xFF5555 : 0x44DD88;
     this.infoBtnBg.clear();

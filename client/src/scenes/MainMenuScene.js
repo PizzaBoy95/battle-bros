@@ -601,45 +601,87 @@ export class MainMenuScene extends Phaser.Scene {
     const panel = this._makePanel(520);
     this._panels.shop = panel;
 
-    const title = this.add.text(W/2,32,'🏪  SHOP',{fontSize:'18px',fill:'#FFD700',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5);
+    const title = this.add.text(W/2,30,'🏪  SHOP',{fontSize:'22px',fill:'#FFD700',fontFamily:'Arial Black, Arial',fontStyle:'bold',stroke:'#000',strokeThickness:3}).setOrigin(0.5);
     panel.add(title);
 
     const items = [
-      { icon:'⚗️',  name:'XP Potion',      desc:'Boost one character +200 XP', cost:300,  gem:false, color:0x2244aa },
-      { icon:'⚡',  name:'Elixir Flask',    desc:'Double elixir for next match', cost:150,  gem:false, color:0x660088 },
-      { icon:'🛡️',  name:'Shield Charm',    desc:'+15% tower HP next battle',    cost:500,  gem:false, color:0x224488 },
-      { icon:'🃏',  name:'Card Pack (x5)',  desc:'5 random character cards',     cost:800,  gem:false, color:0x886600 },
-      { icon:'💎',  name:'Gem Bundle x50',  desc:'50 Gems added to account',     cost:250,  gem:true,  color:0x660066 },
-      { icon:'🔓',  name:'Unlock Slot',     desc:'Unlock 1 mystery character',   cost:1500, gem:false, color:0x446600 },
+      { icon:'⚗️',  name:'XP Potion',      desc:'Boost one character +200 XP',  cost:300,  gem:false, color:0x3366CC },
+      { icon:'⚡',  name:'Elixir Flask',    desc:'Double elixir for next match', cost:150,  gem:false, color:0x9933CC },
+      { icon:'🛡️',  name:'Shield Charm',    desc:'+15% tower HP next battle',    cost:500,  gem:false, color:0x2E86AB },
+      { icon:'🃏',  name:'Card Pack (x5)',  desc:'5 random character cards',     cost:800,  gem:false, color:0xCC8800 },
+      { icon:'💎',  name:'Gem Bundle x50',  desc:'50 Gems added to account',     cost:250,  gem:true,  color:0xAA33CC },
+      { icon:'🔓',  name:'Unlock Slot',     desc:'Unlock 1 mystery character',   cost:1500, gem:false, color:0x55AA33 },
     ];
 
-    items.forEach((item,i) => {
-      const row = Math.floor(i/2), col = i%2;
-      const x = 12 + col*(W/2-8), y = 64 + row*108;
-      const iw = W/2-16, ih = 98;
+    // ── One large row per item, in a scrollable masked list ─────────────────
+    const PANEL_H = 520, LIST_TOP = 56, ROW_H = 96, PAD = 12;
+    const listH = PANEL_H - LIST_TOP - 10;
+    const list = this.add.container(0, 0);
+    panel.add(list);
 
+    items.forEach((item, i) => {
+      const y = i * (ROW_H + PAD), iw = W - 28, x = 14;
       const bg = this.add.graphics();
-      bg.fillStyle(item.color,0.3); bg.fillRoundedRect(x,y,iw,ih,10);
-      bg.lineStyle(1.5,item.color,0.7); bg.strokeRoundedRect(x,y,iw,ih,10);
-      bg.fillStyle(0xFFFFFF,0.04); bg.fillRoundedRect(x+2,y+2,iw-4,30,8);
-
-      const icon = this.add.text(x+iw/2,y+18,item.icon,{fontSize:'22px'}).setOrigin(0.5);
-      const name = this.add.text(x+iw/2,y+42,item.name,{fontSize:'11px',fill:'#FFFFFF',fontFamily:'Arial',fontStyle:'bold',align:'center',wordWrap:{width:iw-8}}).setOrigin(0.5);
-      const desc = this.add.text(x+iw/2,y+62,item.desc,{fontSize:'8px',fill:'#8899AA',fontFamily:'Arial',align:'center',wordWrap:{width:iw-10}}).setOrigin(0.5);
-
+      // Card: colored left accent + dark body + soft top shine
+      bg.fillStyle(0x0d1730, 0.96); bg.fillRoundedRect(x, y, iw, ROW_H, 14);
+      bg.fillStyle(item.color, 0.22); bg.fillRoundedRect(x, y, iw, ROW_H, 14);
+      bg.fillStyle(item.color, 0.9);  bg.fillRoundedRect(x, y, 7, ROW_H, { tl: 14, bl: 14, tr: 0, br: 0 });
+      bg.fillStyle(0xFFFFFF, 0.06);   bg.fillRoundedRect(x + 3, y + 3, iw - 6, ROW_H * 0.4, 11);
+      bg.lineStyle(2, item.color, 0.75); bg.strokeRoundedRect(x, y, iw, ROW_H, 14);
+      // Icon chip
+      const chip = this.add.graphics();
+      chip.fillStyle(item.color, 0.35); chip.fillRoundedRect(x + 16, y + 18, 60, 60, 12);
+      chip.lineStyle(1.5, item.color, 0.9); chip.strokeRoundedRect(x + 16, y + 18, 60, 60, 12);
+      const icon = this.add.text(x + 46, y + 48, item.icon, { fontSize: '32px' }).setOrigin(0.5);
+      // Name + description — big and readable
+      const name = this.add.text(x + 90, y + 20, item.name, { fontSize: '17px', fill: '#FFFFFF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold' });
+      const desc = this.add.text(x + 90, y + 46, item.desc, { fontSize: '12px', fill: '#9FB2D8', fontFamily: 'Arial', wordWrap: { width: iw - 190 } });
+      // Big BUY price pill on the right
+      const pw = 86, ph2 = 34, pxx = x + iw - pw - 14, pyy = y + ROW_H / 2 - ph2 / 2;
       const buyBg = this.add.graphics();
-      buyBg.fillStyle(item.gem?0x8800cc:0xaa6600); buyBg.fillRoundedRect(x+iw/2-32,y+78,64,16,5);
-      const costLabel = this.add.text(x+iw/2,y+86,(item.gem?'💎 ':'💰 ')+item.cost,{fontSize:'10px',fill:'#FFFFFF',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5).setInteractive({useHandCursor:true});
-      costLabel.on('pointerdown',()=>{
+      const bCol = item.gem ? 0x8822CC : 0xD99A1B;
+      buyBg.fillStyle(item.gem ? 0x5A1188 : 0x8A5E00); buyBg.fillRoundedRect(pxx, pyy + 3, pw, ph2, 10);
+      buyBg.fillStyle(bCol); buyBg.fillRoundedRect(pxx, pyy, pw, ph2 - 3, 10);
+      buyBg.fillStyle(0xFFFFFF, 0.22); buyBg.fillRoundedRect(pxx + 3, pyy + 3, pw - 6, 11, 6);
+      const costLabel = this.add.text(pxx + pw / 2, pyy + ph2 / 2 - 2, (item.gem ? '💎 ' : '🪙 ') + item.cost, { fontSize: '14px', fill: '#FFFFFF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold', stroke: '#000', strokeThickness: 2 }).setOrigin(0.5);
+      const buyZone = this.add.zone(pxx + pw / 2, pyy + ph2 / 2, pw + 14, ph2 + 14).setOrigin(0.5).setInteractive({ useHandCursor: true });
+      buyZone.on('pointerover', () => costLabel.setScale(1.08));
+      buyZone.on('pointerout',  () => costLabel.setScale(1));
+      buyZone.on('pointerdown', () => {
         if (this.gold >= item.cost || item.gem) {
-          if (!item.gem) { this.gold -= item.cost; localStorage.setItem('bb_gold',String(this.gold)); }
-          this._flashMsg(item.name+' purchased!');
-        } else {
-          this._flashMsg('Not enough gold!');
-        }
+          if (!item.gem) { this.gold -= item.cost; localStorage.setItem('bb_gold', String(this.gold)); }
+          audioSystem.playClick();
+          this._flashMsg(item.name + ' purchased!');
+        } else this._flashMsg('Not enough gold!');
       });
-      panel.add([bg,icon,name,desc,buyBg,costLabel]);
+      list.add([bg, chip, icon, name, desc, buyBg, costLabel, buyZone]);
     });
+
+    // Mask the list to the panel body (screen-space at the panel's final Y)
+    const { H } = this;
+    const panelTop = H - 74 - PANEL_H;
+    list.y = LIST_TOP;
+    const mshape = this.make.graphics({ add: false });
+    mshape.fillStyle(0xffffff); mshape.fillRect(0, panelTop + LIST_TOP, W, listH);
+    list.setMask(mshape.createGeometryMask());
+    // Drag scrolling
+    const contentH = items.length * (ROW_H + PAD);
+    const maxScroll = Math.max(0, contentH - listH + 8);
+    const scrollZone = this.add.zone(W / 2, LIST_TOP + listH / 2, W, listH).setOrigin(0.5).setInteractive();
+    panel.add(scrollZone);
+    panel.sendToBack(scrollZone);   // keep BUY buttons on top for taps
+    let lastY = null;
+    scrollZone.on('pointerdown', (p) => { lastY = p.y; });
+    scrollZone.on('pointermove', (p) => {
+      if (lastY == null || !p.isDown) return;
+      list.y = Phaser.Math.Clamp(list.y + (p.y - lastY), LIST_TOP - maxScroll, LIST_TOP);
+      lastY = p.y;
+    });
+    scrollZone.on('pointerup', () => { lastY = null; });
+    if (maxScroll > 0) {
+      const hint = this.add.text(W / 2, PANEL_H - 16, '▾ scroll for more ▾', { fontSize: '10px', fill: '#5B6B9A', fontFamily: 'Arial', fontStyle: 'bold' }).setOrigin(0.5);
+      panel.add(hint);
+    }
   }
 
   // ── STATS PANEL ───────────────────────────────────────────────────────────
