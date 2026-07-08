@@ -312,6 +312,32 @@ class AudioSystem {
     this._noise(0.10, now, 0.04, 1800);
   }
 
+  // Melee whoosh — filtered noise sweep
+  playSwing() {
+    if (!this.sfxEnabled || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    this._noise(0.09, now, 0.12, 900);
+    this._note(320, now + 0.02, 0.05, 0.05, 'triangle', false);
+  }
+
+  // Arrow / projectile release — sharp twang
+  playArrow() {
+    if (!this.sfxEnabled || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    this._note(880, now, 0.04, 0.08, 'triangle', false);
+    this._note(440, now + 0.03, 0.06, 0.05, 'sine', false);
+    this._noise(0.04, now, 0.05, 4000);
+  }
+
+  // Explosion — deep boom + debris noise
+  playBoom() {
+    if (!this.sfxEnabled || !this.ctx) return;
+    const now = this.ctx.currentTime;
+    this._note(60, now, 0.30, 0.26, 'sine', false);
+    this._note(42, now + 0.05, 0.28, 0.20, 'sine', false);
+    this._noise(0.18, now, 0.22, 700);
+  }
+
   playTowerHit() {
     if (!this.sfxEnabled || !this.ctx) return;
     const now = this.ctx.currentTime;

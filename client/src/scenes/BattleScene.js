@@ -865,6 +865,24 @@ export class BattleScene extends Phaser.Scene {
           const want = isMoving ? `${o.charId}_run`
             : (this.anims.exists(`${o.charId}_idle`) ? `${o.charId}_idle` : `${o.charId}_run`);
           if (o.g.anims?.currentAnim?.key !== want) o.g.play(want, true);
+
+          // Side-view sprites moving up/down lanes: weave in a shallow S so
+          // there is always real horizontal motion, face the weave direction,
+          // and lean into the vertical travel — reads as charging upfield
+          // instead of crab-walking sideways.
+          if (isMoving) {
+            const wPh = o.walkT * 1.15 + o.phase;
+            o.weaveX = Math.sin(wPh) * 12;
+            const wDir = Math.cos(wPh);
+            if (Math.abs(wDir) > 0.3) o.g.setFlipX(wDir < 0);
+            const dirY = Math.sign(o.ty - o.dispY);
+            o.aimRot = (o.g.flipX ? -1 : 1) * dirY * 0.30;
+          } else {
+            o.weaveX = (o.weaveX || 0) * 0.85;
+            o.aimRot = (o.aimRot || 0) * 0.85;
+          }
+        } else {
+          o.weaveX = (o.weaveX || 0) * 0.8;   // stand ground while swinging
         }
       } else if (o.isAir) {
         bob = Math.sin(ph * 1.6) * 5;          // gentle hover
@@ -877,7 +895,7 @@ export class BattleScene extends Phaser.Scene {
         sqStretch = 1 + Math.sin(ph) * 0.02;
       }
 
-      const bx = o.dispX + o.lungeX + o.kbX;
+      const bx = o.dispX + o.lungeX + o.kbX + (o.weaveX || 0);
       const by = o.dispY + o.lungeY + o.kbY;
 
       // ── Dynamic shadow (shrinks as unit rises) ───────────────────────────
@@ -962,6 +980,7 @@ export class BattleScene extends Phaser.Scene {
         const animObj = this.anims.get(`${best.charId}_attack`);
         best.attackUntil = this.time.now + (animObj?.duration || 500);
         best.g.play(`${best.charId}_attack`, true);
+        if ((best.char?.range ?? 80) < 120) audioSystem.playSwing?.();  // melee whoosh
       }
     }
   }
@@ -1104,6 +1123,7 @@ export class BattleScene extends Phaser.Scene {
     b.play('explosion_anim');
     b.once('animationcomplete', () => b.destroy());
     this.cameras.main.shake(90, 0.004);
+    audioSystem.playBoom?.();
   }
 
   // Short-lived fire pool (Tiny Swords sheet)
@@ -1142,6 +1162,7 @@ export class BattleScene extends Phaser.Scene {
       const key = charId === 'arrow_jack' && this.textures.exists('arrow_jack_proj')
         ? 'arrow_jack_proj' : (this.textures.exists('ts_arrow') ? 'ts_arrow' : null);
       if (key) {
+        audioSystem.playArrow?.();
         const p = this.add.image(fx, fy, key).setDepth(14);
         p.setScale(key === 'ts_arrow' ? 0.5 : 1.6);
         if (charId === 'volt_ranger') p.setTint(0xFFE066);

@@ -494,6 +494,166 @@
    "bottom": 58
   }
  },
+ "void_reaper": {
+  "anims": {
+   "idle": {
+    "fw": 150,
+    "fh": 150,
+    "n": 8
+   },
+   "run": {
+    "fw": 150,
+    "fh": 150,
+    "n": 8
+   },
+   "attack": {
+    "fw": 150,
+    "fh": 150,
+    "n": 8
+   },
+   "death": {
+    "fw": 150,
+    "fh": 150,
+    "n": 5
+   }
+  },
+  "tint": null,
+  "trim": {
+   "x": 57,
+   "y": 45,
+   "w": 32,
+   "h": 55,
+   "bottom": 50
+  }
+ },
+ "king_aurel": {
+  "anims": {
+   "idle": {
+    "fw": 155,
+    "fh": 155,
+    "n": 6
+   },
+   "run": {
+    "fw": 155,
+    "fh": 155,
+    "n": 8
+   },
+   "attack": {
+    "fw": 155,
+    "fh": 155,
+    "n": 6
+   },
+   "death": {
+    "fw": 155,
+    "fh": 155,
+    "n": 11
+   }
+  },
+  "tint": null,
+  "trim": {
+   "x": 49,
+   "y": 35,
+   "w": 35,
+   "h": 81,
+   "bottom": 39
+  }
+ },
+ "doom_blade": {
+  "anims": {
+   "idle": {
+    "fw": 150,
+    "fh": 150,
+    "n": 8
+   },
+   "run": {
+    "fw": 150,
+    "fh": 150,
+    "n": 8
+   },
+   "attack": {
+    "fw": 150,
+    "fh": 150,
+    "n": 4
+   },
+   "death": {
+    "fw": 150,
+    "fh": 150,
+    "n": 6
+   }
+  },
+  "tint": null,
+  "trim": {
+   "x": 62,
+   "y": 54,
+   "w": 26,
+   "h": 41,
+   "bottom": 55
+  }
+ },
+ "iron_vanguard": {
+  "anims": {
+   "idle": {
+    "fw": 137,
+    "fh": 137,
+    "n": 8
+   },
+   "run": {
+    "fw": 137,
+    "fh": 137,
+    "n": 11
+   },
+   "attack": {
+    "fw": 137,
+    "fh": 137,
+    "n": 5
+   },
+   "death": {
+    "fw": 137,
+    "fh": 137,
+    "n": 12
+   }
+  },
+  "tint": null,
+  "trim": {
+   "x": 71,
+   "y": 44,
+   "w": 44,
+   "h": 81,
+   "bottom": 12
+  }
+ },
+ "storm_herald": {
+  "anims": {
+   "idle": {
+    "fw": 162,
+    "fh": 162,
+    "n": 10
+   },
+   "run": {
+    "fw": 162,
+    "fh": 162,
+    "n": 8
+   },
+   "attack": {
+    "fw": 162,
+    "fh": 162,
+    "n": 7
+   },
+   "death": {
+    "fw": 162,
+    "fh": 162,
+    "n": 7
+   }
+  },
+  "tint": null,
+  "trim": {
+   "x": 66,
+   "y": 56,
+   "w": 39,
+   "h": 45,
+   "bottom": 61
+  }
+ },
  "blaze_witch": {
   "anims": {
    "idle": {

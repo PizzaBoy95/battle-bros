@@ -23,15 +23,30 @@ export function rollReward(rarity) {
 
   let charReward = null;
   if (Math.random() < data.cardChance) {
-    // Pick a character matching rarity or lower
+    // Pick a character matching rarity or lower (locked heroes excluded here)
     const eligible = CHARACTER_IDS.filter(id => {
       const c = CHARACTERS[id];
+      if (c.locked) return false;
       if (rarity === 'legendary') return c.rarity === 'legendary';
       if (rarity === 'epic')      return ['epic', 'legendary'].includes(c.rarity);
       if (rarity === 'rare')      return ['rare', 'epic'].includes(c.rarity);
       return true;
     });
     charReward = eligible[Math.floor(Math.random() * eligible.length)] || null;
+  }
+
+  // Locked mystery heroes — the jackpot roll. Better chests = better odds.
+  const lockedChance = { common: 0.02, rare: 0.06, epic: 0.16, legendary: 0.40 }[rarity] || 0;
+  if (Math.random() < lockedChance) {
+    const lockedPool = CHARACTER_IDS.filter(id => {
+      const c = CHARACTERS[id];
+      if (!c.locked) return false;
+      if (rarity === 'legendary') return true;
+      if (rarity === 'epic')      return c.rarity !== 'legendary';
+      return c.rarity === 'rare';
+    });
+    const pick = lockedPool[Math.floor(Math.random() * lockedPool.length)];
+    if (pick) charReward = pick;   // overrides the normal card — it's an UNLOCK
   }
 
   // Global Chat Scroll drop — rarer chests carry them more often

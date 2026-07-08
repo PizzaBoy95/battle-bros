@@ -90,6 +90,9 @@ router.post('/loot/claim', authMiddleware, (req, res) => {
     .run(req.user.id, rarity, goldReward || 0, charReward || null);
 
   if (charReward) {
+    // Upsert so locked mystery heroes (no seeded row) unlock on first drop
+    db.prepare('INSERT OR IGNORE INTO character_progress (user_id, char_id, level, xp, cards_owned) VALUES (?, ?, 1, 0, 0)')
+      .run(req.user.id, charReward);
     db.prepare('UPDATE character_progress SET cards_owned = cards_owned + 1 WHERE user_id = ? AND char_id = ?')
       .run(req.user.id, charReward);
   }

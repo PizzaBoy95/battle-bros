@@ -243,6 +243,8 @@ export class CharSelectScene extends Phaser.Scene {
     for (const [charId, card] of Object.entries(this.cards)) {
       if (px >= card.cx - card.CW / 2 && px <= card.cx + card.CW / 2 &&
           localY >= card.cy - card.CH / 2 && localY <= card.cy + card.CH / 2) {
+        // Locked heroes: only show info (no deck toggle)
+        if (card.isLocked) { this._showInfo(charId); return; }
         // Tap the ⓘ button → open stats modal; tap anywhere else → toggle deck
         const dx = px - card.infoCx, dy = localY - card.infoCy;
         if (dx * dx + dy * dy <= card.infoR * card.infoR) {
@@ -261,6 +263,7 @@ export class CharSelectScene extends Phaser.Scene {
     const rc    = RARITY_COLORS[char.rarity];
     const cd    = this.charData[charId] || { level: 1, xp: 0 };
     const isSel = this.selectedDeck.includes(charId);
+    const isLocked = !!char.locked && !this.charData[charId];
     const CW = CARD_W - 2, CH = CARD_H - 2;
     const lx = cx - CW / 2, ly = cy - CH / 2;
 
@@ -368,6 +371,18 @@ export class CharSelectScene extends Phaser.Scene {
       fontSize: '13px', fill: '#9CCBFF', fontFamily: 'Georgia, serif', fontStyle: 'bold italic'
     }).setOrigin(0.5).setDepth(5);
 
+    // ── Locked mystery treatment: dark silhouette + padlock ─────────────────
+    if (isLocked) {
+      if (portrait.setTint) portrait.setTint(0x151528);
+      const lk = this.add.text(cx, portraitCY, '🔒', { fontSize: '30px' }).setOrigin(0.5).setDepth(6);
+      const hint = this.add.text(cx, portraitCY + 26, 'CHEST DROP', {
+        fontSize: '8px', fill: '#C9B078', fontFamily: 'Arial Black, Arial', fontStyle: 'bold', letterSpacing: 1
+      }).setOrigin(0.5).setDepth(6);
+      name.setText('???');
+      this.gridContainer?.add?.([lk, hint]);   // container adopts them below anyway
+      var _lockObjs = [lk, hint];
+    }
+
     // ── Selected checkmark overlay ──────────────────────────────────────────
     const sel = this.add.text(cx, portraitCY, isSel ? '✓' : '', {
       fontSize: '34px', fill: '#3CE07A', fontFamily: 'Arial', fontStyle: 'bold',
@@ -379,7 +394,7 @@ export class CharSelectScene extends Phaser.Scene {
     const banShine = topShine; // alias so destroy loop still works
 
     this.cards[charId] = {
-      cx, cy, CW, CH, rc, infoCx: ibX, infoCy: ibY, infoR: 15,
+      cx, cy, CW, CH, rc, isLocked, infoCx: ibX, infoCy: ibY, infoR: 15,
       bg, grad1, grad2, pedestal, border, portrait, plateBg, banShine, rarLbl, name,
       ribG, ribLbl, eg, eLbl, lvG, lvLbl, infoG, infoLbl, sel, selOverlay, charId
     };
@@ -697,9 +712,10 @@ export class CharSelectScene extends Phaser.Scene {
 
     // ── Add / Remove button ───────────────────────────────────────────────────
     const inDeck = this.selectedDeck.includes(charId);
+    const lockedNow = !!char.locked && !this.charData[charId];
     const bw = Math.min(360, PW - 60), bh = 58, bx = -bw / 2, byb = PH / 2 - 48 - bh / 2;
-    const btnCol = inDeck ? 0x992222 : 0x227744;
-    const btnBdr = inDeck ? 0xFF5555 : 0x44DD88;
+    const btnCol = lockedNow ? 0x6B5518 : inDeck ? 0x992222 : 0x227744;
+    const btnBdr = lockedNow ? 0xC9B078 : inDeck ? 0xFF5555 : 0x44DD88;
     this.infoBtnBg.clear();
     this.infoBtnBg.fillStyle(btnCol, 1);
     this.infoBtnBg.fillRoundedRect(bx, byb, bw, bh, 10);
@@ -707,7 +723,8 @@ export class CharSelectScene extends Phaser.Scene {
     this.infoBtnBg.fillRoundedRect(bx + 2, byb + 2, bw - 4, bh * 0.42, 8);
     this.infoBtnBg.lineStyle(2, btnBdr, 0.9);
     this.infoBtnBg.strokeRoundedRect(bx, byb, bw, bh, 10);
-    this.infoBtnTxt.setText(inDeck ? '✕  REMOVE FROM DECK' : '✓  ADD TO DECK');
+    this.infoBtnTxt.setText(lockedNow ? '🔒  DROPS FROM LOOT CHESTS'
+      : inDeck ? '✕  REMOVE FROM DECK' : '✓  ADD TO DECK');
 
     this.infoBackdrop.setVisible(true);
     this.infoPanel.setVisible(true);
@@ -722,6 +739,9 @@ export class CharSelectScene extends Phaser.Scene {
 
   // ── Selection ──────────────────────────────────────────────────────────────
   _toggleCard(charId) {
+    if (CHARACTERS[charId]?.locked && !this.charData[charId]) {
+      this._flashMsg('🔒 Locked! Drops from loot chests.'); return;
+    }
     audioSystem.playClick();
     const idx = this.selectedDeck.indexOf(charId);
     if (idx !== -1) {

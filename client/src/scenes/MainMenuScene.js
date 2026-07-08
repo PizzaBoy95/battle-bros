@@ -71,15 +71,18 @@ export class MainMenuScene extends Phaser.Scene {
     sky.fillRect(0, 0, W, H * 0.45);
     // Sea fills the rest
     this.add.tileSprite(W / 2, H * 0.72, W + 64, H * 0.56 + 64, 'water_tile').setDepth(0);
-    // Island: grass strip the castle + warriors stand on
+    // Island: clean manicured lawn (flat gradient + mower stripes — no tile grid)
     const islTop = H * 0.42, islH = H * 0.36;
-    const isl = this.add.tileSprite(W / 2, islTop + islH / 2, W + 32, islH, 'tilemap_flat')
-      .setDepth(1);
-    isl.setTileScale(1, 1); isl.tilePositionX = 64; isl.tilePositionY = 64; // inner grass tile
-    // Island edge shading
-    const edge = this.add.graphics().setDepth(1);
-    edge.fillStyle(0x3f6b30, 0.9); edge.fillRect(0, islTop, W, 4);
-    edge.fillStyle(0x2b4a20, 0.9); edge.fillRect(0, islTop + islH - 4, W, 6);
+    const lawn = this.add.graphics().setDepth(1);
+    lawn.fillGradientStyle(0x86CE58, 0x86CE58, 0x5FA83E, 0x5FA83E, 1);
+    lawn.fillRect(0, islTop, W, islH);
+    for (let i = 0; i < 7; i++) {                       // subtle mower stripes
+      lawn.fillStyle(0xFFFFFF, i % 2 ? 0.045 : 0);
+      lawn.fillRect(0, islTop + (islH / 7) * i, W, islH / 7);
+    }
+    lawn.fillStyle(0xFFF3C0, 0.20); lawn.fillEllipse(W / 2, islTop + 8, W * 0.9, 26); // sunlit crest
+    lawn.fillStyle(0x3f6b30, 0.9);  lawn.fillRect(0, islTop, W, 3);
+    lawn.fillStyle(0x2b4a20, 0.9);  lawn.fillRect(0, islTop + islH - 4, W, 6);
     // Castle — the star of the screen
     this.add.image(W / 2, H * 0.475, 'castle_blue').setOrigin(0.5, 1).setScale(0.86).setDepth(2);
     // Trees + decor + sheep
@@ -273,57 +276,43 @@ export class MainMenuScene extends Phaser.Scene {
   // ══════════════════════════════════════════════════════════════════════════
   _drawCharacterParade() {
     const { W, H } = this;
-    const paradeY = H * 0.630;
-    const count   = PARADE_IDS.length;
-    const gap     = W / count;
-
-    // Ground shadow strip
-    const sg = this.add.graphics().setDepth(11);
-    sg.fillStyle(0x000000, 0.28); sg.fillEllipse(W / 2, paradeY + 40, W * 0.94, 16);
-
-    // Rarity glow colors for parade halos
-    const RARITY_GLOW = { legendary: 0xFFD700, epic: 0xAA44FF, rare: 0x4488FF, common: 0x888888 };
-
+    // Scattered across the lawn in loose ranks — closer to camera = bigger
+    const SPOTS = [
+      [0.10, 0.575], [0.30, 0.560], [0.52, 0.572], [0.72, 0.558], [0.91, 0.575],
+      [0.18, 0.652], [0.40, 0.665], [0.62, 0.655], [0.84, 0.665],
+      [0.50, 0.735]
+    ];
     PARADE_IDS.forEach((charId, i) => {
-      const cx = gap * i + gap / 2;
-      const cy = paradeY + (i % 2 === 0 ? 0 : -10);
-      const char = CHARACTERS?.[charId];
-      const glowCol = RARITY_GLOW[char?.rarity] ?? 0x888888;
+      const [fx, fy] = SPOTS[i % SPOTS.length];
+      const cx = fx * W, cy = fy * H;
+      const depth = 11 + Math.round(fy * 10);                 // lower = in front
+      const hMax = 62 + (fy - 0.55) * 260;                    // 62 → ~110px tall
 
-      // Team-color glow halo behind character
-      const haloG = this.add.graphics().setDepth(11);
-      haloG.fillStyle(glowCol, 0.18); haloG.fillEllipse(cx, cy + 8, 68, 32);
-      haloG.fillStyle(glowCol, 0.10); haloG.fillEllipse(cx, cy + 4, 52, 48);
+      // Soft contact shadow
+      const sh = this.add.graphics().setDepth(depth - 1);
+      sh.fillStyle(0x000000, 0.25); sh.fillEllipse(cx, cy + hMax * 0.36, hMax * 0.7, hMax * 0.14);
 
-      // Character portrait — real hero art, aspect-fit to ~78px tall
       const pKey = cardTexKey(this, charId);
       let unitObj;
       if (pKey) {
-        unitObj = this.add.image(cx, cy, pKey).setDepth(12);
+        unitObj = this.add.image(cx, cy, pKey).setDepth(depth);
         const src = this.textures.get(pKey).getSourceImage();
-        const s = Math.min(64 / src.width, 78 / src.height);
+        const s = Math.min((hMax * 0.8) / src.width, hMax / src.height);
         unitObj.setDisplaySize(src.width * s, src.height * s);
+        if (i % 3 === 1) unitObj.setFlipX(true);              // vary facing
       } else {
-        unitObj = this.add.graphics().setDepth(12);
+        unitObj = this.add.graphics().setDepth(depth);
         unitObj.x = cx; unitObj.y = cy;
         if (DRAW_FUNCS[charId]) DRAW_FUNCS[charId](unitObj);
-        unitObj.setScale(0.65);
+        unitObj.setScale(0.7);
       }
 
-      // Gentle bob tween
+      // Idle bob, staggered
       this.tweens.add({
-        targets: [unitObj, haloG], y: `-=7`,
-        duration: 850 + i * 90, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
+        targets: unitObj, y: cy - 6,
+        duration: 900 + (i * 137) % 500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut'
       });
-
-      // Foot shadow
-      const sh = this.add.graphics().setDepth(11);
-      sh.fillStyle(0x000000, 0.28); sh.fillEllipse(cx, paradeY + 38, 36, 9);
     });
-
-    this.add.text(W / 2, paradeY + 52, 'YOUR WARRIORS AWAIT', {
-      fontSize: '9px', fill: '#5aaa6a', fontFamily: 'Arial', letterSpacing: 3
-    }).setOrigin(0.5).setDepth(12);
   }
 
   // ══════════════════════════════════════════════════════════════════════════
@@ -374,79 +363,54 @@ export class MainMenuScene extends Phaser.Scene {
     this.add.text(W-18,rowY+43,'128W  76L',{fontSize:'10px',fill:'#8899AA',fontFamily:'Arial',align:'right'}).setOrigin(1,0).setDepth(12);
   }
 
+  // Clash-style glossy 3D button: drop shadow, darker bottom lip, bright body,
+  // top gloss, chunky white text. Returns the text object.
+  _glossyBtn(cx, cy, w, h, hue, label, fs, cb) {
+    const dark = Phaser.Display.Color.IntegerToColor(hue).darken(35).color;
+    const lite = Phaser.Display.Color.IntegerToColor(hue).lighten(22).color;
+    const g = this.add.graphics().setDepth(12);
+    g.fillStyle(0x000000, 0.35); g.fillRoundedRect(cx - w/2 + 2, cy - h/2 + 5, w, h, 12);   // shadow
+    g.fillStyle(dark, 1);        g.fillRoundedRect(cx - w/2, cy - h/2, w, h, 12);           // lip
+    g.fillStyle(hue, 1);         g.fillRoundedRect(cx - w/2, cy - h/2, w, h - 5, 12);       // body
+    g.fillStyle(lite, 0.65);     g.fillRoundedRect(cx - w/2 + 3, cy - h/2 + 3, w - 6, h * 0.34, 9); // gloss
+    g.lineStyle(2, dark, 0.9);   g.strokeRoundedRect(cx - w/2, cy - h/2, w, h, 12);
+    const t = this.add.text(cx, cy - 3, label, {
+      fontSize: fs, fill: '#FFFFFF', fontFamily: 'Arial Black, Arial', fontStyle: 'bold',
+      stroke: '#00000055', strokeThickness: 5, shadow: { offsetY: 2, color: '#00000066', fill: true }
+    }).setOrigin(0.5).setDepth(13);
+    const z = this.add.zone(cx, cy, w + 8, h + 8).setOrigin(0.5).setInteractive({ useHandCursor: true }).setDepth(14);
+    z.on('pointerover', () => { t.setScale(1.05); g.setAlpha(0.92); });
+    z.on('pointerout',  () => { t.setScale(1);    g.setAlpha(1); });
+    z.on('pointerdown', () => { audioSystem.playClick?.(); t.setScale(0.96);
+      this.time.delayedCall(80, () => { t.setScale(1); cb(); }); });
+    return t;
+  }
+
   _drawBattleBar() {
     const { W, H } = this;
     const rowY = H * 0.083;
-    const bg = this.add.graphics().setDepth(11);
-    bg.fillStyle(0x000000,0.52); bg.fillRoundedRect(8,rowY,W-16,130,12);
-    bg.lineStyle(1,0x2a5a3a,0.45); bg.strokeRoundedRect(8,rowY,W-16,130,12);
 
-    const bw = (W-32)*0.58;
+    // Row 1: BATTLE (gold, hero button) + 2v2 (blue) — floating, no box
+    const bw = (W - 40) * 0.56, bx2w = (W - 40) * 0.44 - 8;
+    const btn = this._glossyBtn(20 + bw/2, rowY + 29, bw, 58, 0xF2A81D, '⚔ BATTLE', '24px', () => this._goCharSelect('1v1'));
+    this._glossyBtn(28 + bw + bx2w/2, rowY + 29, bx2w, 58, 0x2FA8E0, '2v2', '21px', () => this._goCharSelect('2v2'));
 
-    // ── BATTLE (1v1) — real carved button art ────────────────────────────────
-    const useTS = this.textures.exists('btn_red3');
-    let bb;
-    if (useTS) {
-      bb = this.add.image(16 + bw / 2, rowY + 28, 'btn_red3').setDepth(12).setDisplaySize(bw, 52);
-    } else {
-      bb = this.add.graphics().setDepth(12);
-      bb.fillStyle(0xBB2200); bb.fillRoundedRect(16,rowY+8,bw,40,8);
-      bb.fillStyle(0xFF4400); bb.fillRoundedRect(16,rowY+8,bw,34,8);
-    }
-    const btn = this.add.text(16+bw/2,rowY+26,'⚔  BATTLE',{fontSize:'21px',fill:'#FFFFFF',fontFamily:'Arial Black, Arial',fontStyle:'bold',stroke:'#551100',strokeThickness:4}).setOrigin(0.5).setDepth(13).setInteractive({useHandCursor:true});
-    btn.on('pointerdown',()=>this._goCharSelect('1v1'));
-    btn.on('pointerover',()=>{bb.setAlpha(0.82);btn.setScale(1.05);});
-    btn.on('pointerout', ()=>{bb.setAlpha(1);btn.setScale(1);});
-    // Repeating shimmer pan across BATTLE button every 3.5s
-    const _shimmerBattle = () => {
-      const sh = this.add.rectangle(16, rowY + 8, 28, 34, 0xFFFFFF, 0.28).setDepth(14).setOrigin(0,0);
-      this.tweens.add({ targets: sh, x: 16 + bw, duration: 500, ease: 'Linear', onComplete: () => sh.destroy() });
-      this.time.delayedCall(3500, _shimmerBattle);
+    // Shimmer sweep across BATTLE
+    const _shimmer = () => {
+      const sh = this.add.rectangle(20, rowY + 4, 24, 50, 0xFFFFFF, 0.30).setDepth(14).setOrigin(0, 0).setAngle(8);
+      this.tweens.add({ targets: sh, x: 20 + bw, duration: 520, ease: 'Linear', onComplete: () => sh.destroy() });
+      this.time.delayedCall(3600, _shimmer);
     };
-    this.time.delayedCall(1200, _shimmerBattle);
+    this.time.delayedCall(1200, _shimmer);
 
-    // ── 2v2 ───────────────────────────────────────────────────────────────
-    const bx2=16+bw+4, bw2=W-32-bw-4;
-    if (useTS) {
-      this.add.image(bx2 + bw2 / 2, rowY + 28, 'btn_blue3').setDepth(12).setDisplaySize(bw2, 52);
-    } else {
-      const bb2=this.add.graphics().setDepth(12);
-      bb2.fillStyle(0x1a3a88); bb2.fillRoundedRect(bx2,rowY+8,bw2,40,8);
-      bb2.fillStyle(0x3366CC); bb2.fillRoundedRect(bx2,rowY+8,bw2,34,8);
-    }
-    const btn2=this.add.text(bx2+bw2/2,rowY+26,'2v2',{fontSize:'18px',fill:'#FFFFFF',fontFamily:'Arial Black, Arial',fontStyle:'bold',stroke:'#113355',strokeThickness:4}).setOrigin(0.5).setDepth(13).setInteractive({useHandCursor:true});
-    btn2.on('pointerdown',()=>this._goCharSelect('2v2'));
+    // Row 2: bot modes (smaller, muted)
+    const by2 = rowY + 70;
+    this._glossyBtn(20 + (W-48)/4, by2 + 19, (W-48)/2, 42, 0x3FA34D, '🤖 vs BOT', '14px', () => this._goCharSelect('bot'));
+    this._glossyBtn(28 + (W-48)*0.75, by2 + 19, (W-48)/2, 42, 0x4A69BD, '🤖 2v2 BOT', '14px', () => this._goCharSelect('2v2_bot'));
 
-    // ── 🤖 vs BOT ────────────────────────────────────────────────────────
-    const trg=this.add.graphics().setDepth(12);
-    trg.fillStyle(0x1a4a1a); trg.fillRoundedRect(16,rowY+54,(W-32)*0.47,34,8);
-    trg.fillStyle(0x2a7a2a); trg.fillRoundedRect(16,rowY+54,(W-32)*0.47,28,8);
-    trg.fillStyle(0x44AA44,0.28); trg.fillRoundedRect(18,rowY+56,(W-32)*0.32,12,4);
-    this.add.text(16+(W-32)*0.235,rowY+70,'🤖 vs BOT',{fontSize:'13px',fill:'#CCFFCC',fontFamily:'Arial',fontStyle:'bold',stroke:'#001100',strokeThickness:2}).setOrigin(0.5).setDepth(13).setInteractive({useHandCursor:true})
-      .on('pointerdown',()=>this._goCharSelect('bot'));
-
-    // ── 2v2 vs BOT ───────────────────────────────────────────────────────
-    const bvx=16+(W-32)*0.50+4, bvw=(W-32)*0.50-4;
-    const bvg=this.add.graphics().setDepth(12);
-    bvg.fillStyle(0x1a3a6a); bvg.fillRoundedRect(bvx,rowY+54,bvw,34,8);
-    bvg.fillStyle(0x2255aa); bvg.fillRoundedRect(bvx,rowY+54,bvw,28,8);
-    bvg.fillStyle(0x4488dd,0.28); bvg.fillRoundedRect(bvx+2,rowY+56,bvw*0.65,12,4);
-    this.add.text(bvx+bvw/2,rowY+70,'🤖 2v2 BOT',{fontSize:'13px',fill:'#AADDFF',fontFamily:'Arial',fontStyle:'bold',stroke:'#000a22',strokeThickness:2}).setOrigin(0.5).setDepth(13).setInteractive({useHandCursor:true})
-      .on('pointerdown',()=>this._goCharSelect('2v2_bot'));
-
-    // ── 🏆 RANKED PLAY — gold ribbon banner ───────────────────────────────
-    let rkg;
-    if (this.textures.exists('ribbon_yellow')) {
-      rkg = this.add.image(W/2, rowY+108, 'ribbon_yellow').setDepth(12).setDisplaySize(W-24, 40);
-    } else {
-      rkg = this.add.graphics().setDepth(12);
-      rkg.fillStyle(0x4a2a00); rkg.fillRoundedRect(16,rowY+94,W-32,28,8);
-      rkg.fillStyle(0xaa6600); rkg.fillRoundedRect(16,rowY+94,W-32,22,8);
-    }
-    const rkBtn=this.add.text(W/2,rowY+105,'🏆  RANKED PLAY — Season 1',{fontSize:'13px',fill:'#5A3400',fontFamily:'Arial Black, Arial',fontStyle:'bold'}).setOrigin(0.5).setDepth(13).setInteractive({useHandCursor:true});
-    rkBtn.on('pointerdown',()=>this._goCharSelect('ranked'));
-    rkBtn.on('pointerover',()=>{rkg.setAlpha(0.85);rkBtn.setScale(1.03);});
-    rkBtn.on('pointerout', ()=>{rkg.setAlpha(1);rkBtn.setScale(1);});
+    // Row 3: RANKED — slim royal purple bar
+    const by3 = by2 + 50;
+    this._glossyBtn(W/2, by3 + 17, W - 40, 38, 0x8E44AD, '🏆 RANKED — Season 1', '14px', () => this._goCharSelect('ranked'));
   }
 
   _goCharSelect(mode) {

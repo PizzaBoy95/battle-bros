@@ -219,6 +219,43 @@ const CHARACTERS = {
     special: 'place_turret',
     specialDesc: 'Places a cannon turret that fires automatically',
     color: 0xE17055, accentColor: 0xFDCB6E
+  },
+
+  // ── Locked mystery heroes (chest-drop unlocks; stronger for their rarity) ──
+  void_reaper: {
+    id: 'void_reaper', name: 'Void Reaper', rarity: 'legendary', locked: true,
+    type: 'ground', hp: 1600, damage: 310, speed: 70,
+    attackSpeed: 0.9, range: 270, elixirCost: 5,
+    special: 'soul_burn', specialDesc: 'Flame bolts deal +50% damage to towers',
+    color: 0x8B0000, accentColor: 0xFF6B35
+  },
+  king_aurel: {
+    id: 'king_aurel', name: 'King Aurel', rarity: 'legendary', locked: true,
+    type: 'ground', hp: 3200, damage: 210, speed: 55,
+    attackSpeed: 0.8, range: 54, elixirCost: 6,
+    special: 'royal_decree', specialDesc: 'Nearby allies fight 15% faster',
+    color: 0xB03A48, accentColor: 0xFFD700
+  },
+  storm_herald: {
+    id: 'storm_herald', name: 'Storm Herald', rarity: 'epic', locked: true,
+    type: 'ground', hp: 1900, damage: 240, speed: 85,
+    attackSpeed: 1.0, range: 52, elixirCost: 4,
+    special: 'tempest_slash', specialDesc: 'Every 3rd strike hits all nearby foes',
+    color: 0x4A6FA5, accentColor: 0xBFEFFF
+  },
+  doom_blade: {
+    id: 'doom_blade', name: 'Doom Blade', rarity: 'epic', locked: true,
+    type: 'ground', hp: 1300, damage: 280, speed: 105,
+    attackSpeed: 1.1, range: 50, elixirCost: 3,
+    special: 'shadowstep', specialDesc: 'First strike on each target is a crit',
+    color: 0x7A1F2B, accentColor: 0x2D3436
+  },
+  iron_vanguard: {
+    id: 'iron_vanguard', name: 'Iron Vanguard', rarity: 'rare', locked: true,
+    type: 'ground', hp: 2400, damage: 160, speed: 60,
+    attackSpeed: 0.8, range: 52, elixirCost: 4,
+    special: 'bulwark', specialDesc: 'Takes 20% less damage while attacking',
+    color: 0x5A6B7A, accentColor: 0xC0C8D0
   }
 };
 
