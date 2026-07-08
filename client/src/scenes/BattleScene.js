@@ -711,11 +711,12 @@ export class BattleScene extends Phaser.Scene {
     // Body
     let g, baseScale;
     if (isSheet) {
-      const t = anim.trim || { y: 0, h: anim.anims.idle?.fh || 100, w: 40 };
-      const fh = anim.anims.run.fh;
-      // Feet line inside the frame → origin so unit y = feet
+      const t = anim.trim || { x: 0, y: 0, h: anim.anims.idle?.fh || 100, w: 40 };
+      const fh = anim.anims.run.fh, fw = anim.anims.run.fw;
+      // Origin = the character's actual center-x / feet-y inside the padded frame
       const originY = Math.min(0.98, (t.y + t.h) / fh);
-      g = this.add.sprite(u.x, u.y, `${u.charId}_run`).setOrigin(0.5, originY).setDepth(5);
+      const originX = t.x != null ? (t.x + t.w / 2) / fw : 0.5;
+      g = this.add.sprite(u.x, u.y, `${u.charId}_run`).setOrigin(originX, originY).setDepth(5);
       g.play(`${u.charId}_run`);
       const TARGET_H = isAir ? 54 : 62;       // on-screen character height
       baseScale = TARGET_H / Math.max(20, t.h);
@@ -1054,8 +1055,8 @@ export class BattleScene extends Phaser.Scene {
         const p = this.add.image(fx, fy, key).setDepth(14);
         p.setScale(key === 'ts_arrow' ? 0.5 : 1.6);
         if (charId === 'volt_ranger') p.setTint(0xFFE066);
-        // ts_arrow points down; pack arrow points right
-        p.setRotation(Math.atan2(dyy, dxx) + (key === 'ts_arrow' ? -Math.PI / 2 : 0));
+        // both arrow textures point right → rotate straight toward the target
+        p.setRotation(Math.atan2(dyy, dxx));
         this.tweens.add({ targets: p, x: tx, y: ty, duration: Math.min(distT * 0.85, 320), ease: 'Linear', onComplete: () => p.destroy() });
         return;
       }

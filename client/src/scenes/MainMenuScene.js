@@ -3,6 +3,7 @@ import { socketManager } from '../network/SocketManager.js';
 import { audioSystem } from '../systems/AudioSystem.js';
 import { DRAW_FUNCS } from '../characters/CharacterGraphics.js';
 import { CHARACTER_IDS, CHARACTERS } from '../characters/CharacterRegistry.js';
+import { cardTexKey } from '../characters/heroTex.js';
 
 const PARADE_IDS = [
   'titan_grunt','pyro_drake','lady_vex','iron_bro',
@@ -22,17 +23,14 @@ export class MainMenuScene extends Phaser.Scene {
     this.gems     = Number(localStorage.getItem('bb_gems')     || 300);
     this._activePanel = null;
 
-    // ── Background layers ──────────────────────────────────────────────────
-    this._drawSky();
-    this._drawStars();
-    this._drawMoon();
-    this._drawMountains();
-    this._drawCastle();
-    this._drawMoatReflection();
-    this._spawnTorches();
-    this._spawnBanner();
-    this._spawnMist();
-    this._startEmbers();
+    // ── Background: Meadow Isles home (matches the new battle art) ─────────
+    if (this.textures.exists('castle_blue') && this.textures.exists('water_tile')) {
+      this._drawMeadowHome();
+    } else {
+      this._drawSky(); this._drawStars(); this._drawMoon();
+      this._drawMountains(); this._drawCastle(); this._drawMoatReflection();
+      this._spawnTorches(); this._spawnBanner(); this._spawnMist(); this._startEmbers();
+    }
 
     // ── Character parade in front of castle ────────────────────────────────
     this._drawCharacterParade();
@@ -57,8 +55,46 @@ export class MainMenuScene extends Phaser.Scene {
   }
 
   // ══════════════════════════════════════════════════════════════════════════
-  // BACKGROUND
+  // BACKGROUND — Meadow Isles home (Tiny Swords CC0 art)
   // ══════════════════════════════════════════════════════════════════════════
+  _drawMeadowHome() {
+    const { W, H } = this;
+    // Warm dusk sky
+    const sky = this.add.graphics().setDepth(0);
+    sky.fillGradientStyle(0x2e4a8f, 0x2e4a8f, 0x7fb0d8, 0xd9a05e, 1);
+    sky.fillRect(0, 0, W, H * 0.45);
+    // Sea fills the rest
+    this.add.tileSprite(W / 2, H * 0.72, W + 64, H * 0.56 + 64, 'water_tile').setDepth(0);
+    // Island: grass strip the castle + warriors stand on
+    const islTop = H * 0.42, islH = H * 0.36;
+    const isl = this.add.tileSprite(W / 2, islTop + islH / 2, W + 32, islH, 'tilemap_flat')
+      .setDepth(1);
+    isl.setTileScale(1, 1); isl.tilePositionX = 64; isl.tilePositionY = 64; // inner grass tile
+    // Island edge shading
+    const edge = this.add.graphics().setDepth(1);
+    edge.fillStyle(0x3f6b30, 0.9); edge.fillRect(0, islTop, W, 4);
+    edge.fillStyle(0x2b4a20, 0.9); edge.fillRect(0, islTop + islH - 4, W, 6);
+    // Castle — the star of the screen
+    this.add.image(W / 2, H * 0.475, 'castle_blue').setOrigin(0.5, 1).setScale(0.86).setDepth(2);
+    // Trees + decor + sheep
+    if (this.textures.exists('tree')) {
+      this.add.image(44, H * 0.47, 'tree', 0).setScale(0.7).setDepth(2);
+      this.add.image(W - 44, H * 0.465, 'tree', 0).setScale(0.62).setDepth(2);
+    }
+    ['deco_02', 'deco_05', 'deco_08'].forEach((k, i) => {
+      if (this.textures.exists(k)) this.add.image(60 + i * (W / 3.2), H * 0.56, k).setDepth(2);
+    });
+    if (this.anims.exists('sheep_anim')) {
+      const sh = this.add.sprite(W * 0.80, H * 0.545, 'sheep').setScale(0.5).setDepth(2);
+      sh.play('sheep_anim');
+    }
+    // Soft vignette so HUD + buttons read clearly
+    const vig = this.add.graphics().setDepth(3);
+    vig.fillStyle(0x000000, 0.42); vig.fillRect(0, 0, W, 60);
+    vig.fillGradientStyle(0x000000, 0x000000, 0x000000, 0x000000, 0, 0, 0.55, 0.55);
+    vig.fillRect(0, H * 0.72, W, H * 0.28);
+  }
+
   _drawSky() {
     const { W, H } = this;
     const g = this.add.graphics().setDepth(0);
@@ -253,11 +289,14 @@ export class MainMenuScene extends Phaser.Scene {
       haloG.fillStyle(glowCol, 0.18); haloG.fillEllipse(cx, cy + 8, 68, 32);
       haloG.fillStyle(glowCol, 0.10); haloG.fillEllipse(cx, cy + 4, 52, 48);
 
-      // Character portrait — 56×72 (larger than before)
-      const pKey = charId + '_p';
+      // Character portrait — real hero art, aspect-fit to ~78px tall
+      const pKey = cardTexKey(this, charId);
       let unitObj;
-      if (this.textures.exists(pKey)) {
-        unitObj = this.add.image(cx, cy, pKey).setDisplaySize(56, 72).setDepth(12);
+      if (pKey) {
+        unitObj = this.add.image(cx, cy, pKey).setDepth(12);
+        const src = this.textures.get(pKey).getSourceImage();
+        const s = Math.min(64 / src.width, 78 / src.height);
+        unitObj.setDisplaySize(src.width * s, src.height * s);
       } else {
         unitObj = this.add.graphics().setDepth(12);
         unitObj.x = cx; unitObj.y = cy;
@@ -338,12 +377,17 @@ export class MainMenuScene extends Phaser.Scene {
 
     const bw = (W-32)*0.58;
 
-    // ── BATTLE (1v1) ───────────────────────────────────────────────────────
-    const bb = this.add.graphics().setDepth(12);
-    bb.fillStyle(0xBB2200); bb.fillRoundedRect(16,rowY+8,bw,40,8);
-    bb.fillStyle(0xFF4400); bb.fillRoundedRect(16,rowY+8,bw,34,8);
-    bb.fillStyle(0xFF6633,0.35); bb.fillRoundedRect(18,rowY+10,bw*0.65,13,4);
-    const btn = this.add.text(16+bw/2,rowY+28,'⚔  BATTLE',{fontSize:'21px',fill:'#FFFFFF',fontFamily:'Arial Black, Arial',fontStyle:'bold',stroke:'#330000',strokeThickness:3}).setOrigin(0.5).setDepth(13).setInteractive({useHandCursor:true});
+    // ── BATTLE (1v1) — real carved button art ────────────────────────────────
+    const useTS = this.textures.exists('btn_red3');
+    let bb;
+    if (useTS) {
+      bb = this.add.image(16 + bw / 2, rowY + 28, 'btn_red3').setDepth(12).setDisplaySize(bw, 52);
+    } else {
+      bb = this.add.graphics().setDepth(12);
+      bb.fillStyle(0xBB2200); bb.fillRoundedRect(16,rowY+8,bw,40,8);
+      bb.fillStyle(0xFF4400); bb.fillRoundedRect(16,rowY+8,bw,34,8);
+    }
+    const btn = this.add.text(16+bw/2,rowY+26,'⚔  BATTLE',{fontSize:'21px',fill:'#FFFFFF',fontFamily:'Arial Black, Arial',fontStyle:'bold',stroke:'#551100',strokeThickness:4}).setOrigin(0.5).setDepth(13).setInteractive({useHandCursor:true});
     btn.on('pointerdown',()=>this._goCharSelect('1v1'));
     btn.on('pointerover',()=>{bb.setAlpha(0.82);btn.setScale(1.05);});
     btn.on('pointerout', ()=>{bb.setAlpha(1);btn.setScale(1);});
@@ -357,11 +401,14 @@ export class MainMenuScene extends Phaser.Scene {
 
     // ── 2v2 ───────────────────────────────────────────────────────────────
     const bx2=16+bw+4, bw2=W-32-bw-4;
-    const bb2=this.add.graphics().setDepth(12);
-    bb2.fillStyle(0x1a3a88); bb2.fillRoundedRect(bx2,rowY+8,bw2,40,8);
-    bb2.fillStyle(0x3366CC); bb2.fillRoundedRect(bx2,rowY+8,bw2,34,8);
-    bb2.fillStyle(0x5588EE,0.32); bb2.fillRoundedRect(bx2+2,rowY+10,bw2*0.65,13,4);
-    const btn2=this.add.text(bx2+bw2/2,rowY+28,'2v2',{fontSize:'18px',fill:'#FFFFFF',fontFamily:'Arial Black, Arial',fontStyle:'bold',stroke:'#001133',strokeThickness:3}).setOrigin(0.5).setDepth(13).setInteractive({useHandCursor:true});
+    if (useTS) {
+      this.add.image(bx2 + bw2 / 2, rowY + 28, 'btn_blue3').setDepth(12).setDisplaySize(bw2, 52);
+    } else {
+      const bb2=this.add.graphics().setDepth(12);
+      bb2.fillStyle(0x1a3a88); bb2.fillRoundedRect(bx2,rowY+8,bw2,40,8);
+      bb2.fillStyle(0x3366CC); bb2.fillRoundedRect(bx2,rowY+8,bw2,34,8);
+    }
+    const btn2=this.add.text(bx2+bw2/2,rowY+26,'2v2',{fontSize:'18px',fill:'#FFFFFF',fontFamily:'Arial Black, Arial',fontStyle:'bold',stroke:'#113355',strokeThickness:4}).setOrigin(0.5).setDepth(13).setInteractive({useHandCursor:true});
     btn2.on('pointerdown',()=>this._goCharSelect('2v2'));
 
     // ── 🤖 vs BOT ────────────────────────────────────────────────────────
@@ -381,14 +428,18 @@ export class MainMenuScene extends Phaser.Scene {
     this.add.text(bvx+bvw/2,rowY+70,'🤖 2v2 BOT',{fontSize:'13px',fill:'#AADDFF',fontFamily:'Arial',fontStyle:'bold',stroke:'#000a22',strokeThickness:2}).setOrigin(0.5).setDepth(13).setInteractive({useHandCursor:true})
       .on('pointerdown',()=>this._goCharSelect('2v2_bot'));
 
-    // ── 🏆 RANKED PLAY ───────────────────────────────────────────────────
-    const rkg=this.add.graphics().setDepth(12);
-    rkg.fillStyle(0x4a2a00); rkg.fillRoundedRect(16,rowY+94,W-32,28,8);
-    rkg.fillStyle(0xaa6600); rkg.fillRoundedRect(16,rowY+94,W-32,22,8);
-    rkg.fillStyle(0xffaa00,0.30); rkg.fillRoundedRect(18,rowY+96,(W-32)*0.6,10,4);
-    const rkBtn=this.add.text(W/2,rowY+107,'🏆  RANKED PLAY  —  Season 1',{fontSize:'13px',fill:'#FFD700',fontFamily:'Arial',fontStyle:'bold',stroke:'#220000',strokeThickness:2}).setOrigin(0.5).setDepth(13).setInteractive({useHandCursor:true});
+    // ── 🏆 RANKED PLAY — gold ribbon banner ───────────────────────────────
+    let rkg;
+    if (this.textures.exists('ribbon_yellow')) {
+      rkg = this.add.image(W/2, rowY+108, 'ribbon_yellow').setDepth(12).setDisplaySize(W-24, 40);
+    } else {
+      rkg = this.add.graphics().setDepth(12);
+      rkg.fillStyle(0x4a2a00); rkg.fillRoundedRect(16,rowY+94,W-32,28,8);
+      rkg.fillStyle(0xaa6600); rkg.fillRoundedRect(16,rowY+94,W-32,22,8);
+    }
+    const rkBtn=this.add.text(W/2,rowY+105,'🏆  RANKED PLAY — Season 1',{fontSize:'13px',fill:'#5A3400',fontFamily:'Arial Black, Arial',fontStyle:'bold'}).setOrigin(0.5).setDepth(13).setInteractive({useHandCursor:true});
     rkBtn.on('pointerdown',()=>this._goCharSelect('ranked'));
-    rkBtn.on('pointerover',()=>{rkg.setAlpha(0.82);rkBtn.setScale(1.03);});
+    rkBtn.on('pointerover',()=>{rkg.setAlpha(0.85);rkBtn.setScale(1.03);});
     rkBtn.on('pointerout', ()=>{rkg.setAlpha(1);rkBtn.setScale(1);});
   }
 
@@ -402,10 +453,11 @@ export class MainMenuScene extends Phaser.Scene {
   // ══════════════════════════════════════════════════════════════════════════
   _drawNavBar() {
     const { W, H } = this;
-    const navY = H - 66;
+    const navY = H - 74;
     const ng = this.add.graphics().setDepth(14);
-    ng.fillStyle(0x000000,0.90); ng.fillRect(0,navY,W,66);
-    ng.lineStyle(1,0x1a3a2a,0.75); ng.lineBetween(0,navY,W,navY);
+    ng.fillStyle(0x070d1a,0.96); ng.fillRect(0,navY,W,74);
+    ng.fillStyle(0xFFFFFF,0.05);  ng.fillRect(0,navY,W,3);
+    ng.lineStyle(1.5,0x2a4a7a,0.8); ng.lineBetween(0,navY,W,navY);
 
     const items = [
       { icon:'🏠', label:'HOME',     x:W*0.10, fn:()=>this._closePanel() },
@@ -415,12 +467,21 @@ export class MainMenuScene extends Phaser.Scene {
       { icon:'⚙️', label:'SETTINGS', x:W*0.90, fn:()=>this._openPanel('settings') },
     ];
     this._navIndicator = this.add.graphics().setDepth(14);
-    this._navIndicator.fillStyle(0x44FF88,0.75); this._navIndicator.fillRect(W*0.10-18,navY,36,3);
+    const _setInd = (x) => {
+      this._navIndicator.clear();
+      this._navIndicator.fillStyle(0x44FF88,0.9);  this._navIndicator.fillRoundedRect(x-22,navY+2,44,4,2);
+      this._navIndicator.fillStyle(0x44FF88,0.10); this._navIndicator.fillRoundedRect(x-30,navY+2,60,68,10);
+    };
+    _setInd(W*0.10);
 
-    items.forEach((it,idx) => {
-      const icon = this.add.text(it.x,navY+16,it.icon,{fontSize:'22px'}).setOrigin(0.5).setDepth(15).setInteractive({useHandCursor:true});
-      this.add.text(it.x,navY+42,it.label,{fontSize:'8px',fill:'#556677',fontFamily:'Arial'}).setOrigin(0.5).setDepth(15).setInteractive({useHandCursor:true});
-      [icon].forEach(obj => obj.on('pointerdown',()=>{ it.fn(); this._navIndicator.clear(); this._navIndicator.fillStyle(0x44FF88,0.75); this._navIndicator.fillRect(it.x-18,navY,36,3); }));
+    items.forEach((it) => {
+      const icon = this.add.text(it.x,navY+22,it.icon,{fontSize:'26px'}).setOrigin(0.5).setDepth(15);
+      const lbl  = this.add.text(it.x,navY+52,it.label,{fontSize:'10px',fill:'#AFC4E0',fontFamily:'Arial Black, Arial',fontStyle:'bold'}).setOrigin(0.5).setDepth(15);
+      // one big tap zone per tab (icon + label + padding)
+      const zone = this.add.zone(it.x, navY+37, W*0.19, 74).setOrigin(0.5).setInteractive({useHandCursor:true}).setDepth(16);
+      zone.on('pointerover',()=>{ icon.setScale(1.15); lbl.setColor('#FFFFFF'); });
+      zone.on('pointerout', ()=>{ icon.setScale(1);    lbl.setColor('#AFC4E0'); });
+      zone.on('pointerdown',()=>{ audioSystem.playClick?.(); it.fn(); _setInd(it.x); });
     });
   }
 
@@ -451,27 +512,35 @@ export class MainMenuScene extends Phaser.Scene {
       this.tweens.add({ targets: panel, alpha:0, y: panel._targetY+60, duration:220, ease:'Power2', onComplete:()=>panel.setVisible(false) });
     }
     this._activePanel = null;
-    // Reset nav indicator
+    // Reset nav indicator to HOME
     const { W, H } = this;
+    const navY = H - 74;
     this._navIndicator.clear();
-    this._navIndicator.fillStyle(0x44FF88,0.75); this._navIndicator.fillRect(W*0.10-18,H-66,36,3);
+    this._navIndicator.fillStyle(0x44FF88,0.9);  this._navIndicator.fillRoundedRect(W*0.10-22,navY+2,44,4,2);
+    this._navIndicator.fillStyle(0x44FF88,0.10); this._navIndicator.fillRoundedRect(W*0.10-30,navY+2,60,68,10);
   }
 
   _makePanel(h) {
     const { W, H } = this;
-    const targetY = H - 66 - h;
+    const targetY = H - 74 - h;
     const panel = this.add.container(0, targetY + 60).setDepth(80).setVisible(false);
     panel._targetY = targetY;
-    // Dark background
+    // Rich card background: deep navy gradient + gold trim
     const bg = this.add.graphics();
-    bg.fillStyle(0x000000, 0.94); bg.fillRoundedRect(0, 0, W, h, {tl:14,tr:14,bl:0,br:0});
-    bg.lineStyle(1,0x2a5a3a,0.6); bg.strokeRoundedRect(0,0,W,h,{tl:14,tr:14,bl:0,br:0});
+    bg.fillGradientStyle(0x101c34, 0x101c34, 0x060a16, 0x060a16, 0.98);
+    bg.fillRoundedRect(0, 0, W, h, {tl:18,tr:18,bl:0,br:0});
+    bg.fillStyle(0xFFFFFF, 0.05); bg.fillRoundedRect(3, 3, W-6, 42, {tl:15,tr:15,bl:0,br:0});
+    bg.lineStyle(2, 0xC8A23A, 0.75); bg.strokeRoundedRect(1, 1, W-2, h, {tl:18,tr:18,bl:0,br:0});
     // Handle bar
-    bg.fillStyle(0x4a7a5a,0.5); bg.fillRoundedRect(W/2-24,10,48,4,2);
-    // Close button
-    const close = this.add.text(W-16,14,'✕',{fontSize:'18px',fill:'#446655',fontFamily:'Arial'}).setOrigin(0.5).setInteractive({useHandCursor:true});
-    close.on('pointerdown',()=>this._closePanel());
-    panel.add([bg,close]);
+    bg.fillStyle(0xC8A23A, 0.6); bg.fillRoundedRect(W/2-26, 8, 52, 5, 2.5);
+    // Close button — big circular target
+    const closeG = this.add.graphics();
+    closeG.fillStyle(0x3a1020, 0.95); closeG.fillCircle(W-26, 24, 15);
+    closeG.lineStyle(2, 0xFF6677, 0.9); closeG.strokeCircle(W-26, 24, 15);
+    const close = this.add.text(W-26, 24, '✕', {fontSize:'16px', fill:'#FFAABB', fontFamily:'Arial Black, Arial', fontStyle:'bold'}).setOrigin(0.5);
+    const closeZone = this.add.zone(W-26, 24, 46, 46).setOrigin(0.5).setInteractive({useHandCursor:true});
+    closeZone.on('pointerdown',()=>this._closePanel());
+    panel.add([bg, closeG, close, closeZone]);
     return panel;
   }
 

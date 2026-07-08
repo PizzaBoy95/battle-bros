@@ -6,10 +6,10 @@ import { xpProgress } from '../systems/LevelSystem.js';
 import { audioSystem } from '../systems/AudioSystem.js';
 
 const DECK_SIZE = 7;
-const COLS      = 4;
-const CARD_W    = 104;   // larger cards (was 90)
-const CARD_H    = 122;   // larger cards (was 106)
-const CARD_PAD  = 8;
+const COLS      = 3;     // 3 per row → bigger, cleaner cards
+const CARD_W    = 142;
+const CARD_H    = 168;
+const CARD_PAD  = 10;
 const SLOT_W    = 48;
 const SLOT_H    = 46;
 const GRID_TOP  = 70;    // viewport top (just below header)
@@ -328,12 +328,12 @@ export class CharSelectScene extends Phaser.Scene {
 
     // Rarity label inside strip
     const rarLbl = this.add.text(cx, cy + CH / 2 - 9, char.rarity.toUpperCase(), {
-      fontSize: '7px', fill: '#000000', fontFamily: 'Arial', fontStyle: 'bold'
+      fontSize: '9px', fill: '#000000', fontFamily: 'Arial', fontStyle: 'bold'
     }).setOrigin(0.5).setDepth(3);
 
     // Character name
-    const name = this.add.text(cx, cy + CH / 2 - plateH + 11, char.name, {
-      fontSize: '8px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold',
+    const name = this.add.text(cx, cy + CH / 2 - plateH + 12, char.name, {
+      fontSize: '12px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold',
       stroke: '#000000', strokeThickness: 2,
       wordWrap: { width: CW - 8 }
     }).setOrigin(0.5).setDepth(3);

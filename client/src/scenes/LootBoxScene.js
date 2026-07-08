@@ -2,6 +2,9 @@ import Phaser from 'phaser';
 import { audioSystem } from '../systems/AudioSystem.js';
 import { SERVER_URL } from '../config.js';
 import { RARITIES } from '../systems/LootSystem.js';
+import { cardTexKey } from '../characters/heroTex.js';
+import { CHARACTERS } from '../characters/CharacterRegistry.js';
+import { xpProgress } from '../systems/LevelSystem.js';
 
 const CLICKS_NEEDED = 10;
 const CLICK_WINDOW_MS = 2500;
@@ -51,6 +54,31 @@ export class LootBoxScene extends Phaser.Scene {
       fontSize: '14px', fill: '#AAAACC', fontFamily: 'Arial', letterSpacing: 2
     }).setOrigin(0.5).setDepth(3);
     this.tweens.add({ targets: this.instructionText, alpha: 0.25, duration: 520, yoyo: true, repeat: -1 });
+
+    // ── Rotating god-rays + pulsing aura behind the chest ────────────────────
+    this.raysG = this.add.graphics().setDepth(2).setPosition(W / 2, H * 0.38);
+    for (let i = 0; i < 12; i++) {
+      const a = (i / 12) * Math.PI * 2;
+      const len = i % 2 === 0 ? 190 : 130;
+      this.raysG.fillStyle(this.rarityCol, i % 2 === 0 ? 0.10 : 0.06);
+      this.raysG.fillTriangle(0, 0,
+        Math.cos(a - 0.10) * len, Math.sin(a - 0.10) * len,
+        Math.cos(a + 0.10) * len, Math.sin(a + 0.10) * len);
+    }
+    this.tweens.add({ targets: this.raysG, angle: 360, duration: 20000, repeat: -1, ease: 'Linear' });
+    const aura = this.add.graphics().setDepth(2);
+    aura.fillStyle(this.rarityCol, 0.16); aura.fillCircle(W / 2, H * 0.38, 96);
+    aura.fillStyle(this.rarityCol, 0.10); aura.fillCircle(W / 2, H * 0.38, 130);
+    this.tweens.add({ targets: aura, alpha: 0.45, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+
+    // Drifting sparkles around the chest
+    this.time.addEvent({ delay: 260, repeat: -1, callback: () => {
+      if (this.opened) return;
+      const sx = W / 2 + (Math.random() - 0.5) * 220, sy = H * 0.38 + (Math.random() - 0.5) * 170;
+      const sp = this.add.text(sx, sy, '✦', { fontSize: '12px', fill: '#FFE9A0' }).setDepth(3).setAlpha(0);
+      this.tweens.add({ targets: sp, alpha: 0.9, y: sy - 16, duration: 480, yoyo: true,
+        onComplete: () => sp.destroy() });
+    }});
 
     // ── Chest ─────────────────────────────────────────────────────────────────
     this.chestContainer = this.add.container(W / 2, H * 0.38).setDepth(5);
@@ -301,6 +329,8 @@ export class LootBoxScene extends Phaser.Scene {
 
     this._claimReward();
     this._spawnParticles(col);
+    this.raysG?.setPosition(W / 2, H * 0.40);
+    this.time.delayedCall(650, () => this._showXpPanel());
 
     // Continue button
     this.time.delayedCall(950, () => {
@@ -327,6 +357,61 @@ export class LootBoxScene extends Phaser.Scene {
       this.tweens.add({ targets: [btnG, btnTxt], alpha: 0, duration: 0 });
       this.tweens.add({ targets: [btnG, btnTxt], alpha: 1, duration: 400 });
     });
+  }
+
+  // Deck characters' level-up progress (how close each is to the next level)
+  async _showXpPanel() {
+    const { width: W, height: H } = this.scale;
+    let charData = {};
+    try {
+      const token = this.registry.get('token') || localStorage.getItem('bb_token');
+      const res = await fetch(`${SERVER_URL}/auth/me`, { headers: { Authorization: `Bearer ${token}` } });
+      if (res.ok) for (const c of (await res.json()).characters || []) charData[c.char_id] = c;
+    } catch { /* offline — show level 1 defaults */ }
+
+    const deck = (this.registry.get('deck') || []).slice(0, 7);
+    if (!deck.length) return;
+
+    const panelY = H * 0.60, rowH = 40, colW = (W - 48) / 2;
+    const pg = this.add.graphics().setDepth(14).setAlpha(0);
+    pg.fillStyle(0x0a1024, 0.92);
+    pg.fillRoundedRect(16, panelY - 14, W - 32, Math.ceil(deck.length / 2) * rowH + 46, 12);
+    pg.lineStyle(1.5, 0xC8A23A, 0.5);
+    pg.strokeRoundedRect(16, panelY - 14, W - 32, Math.ceil(deck.length / 2) * rowH + 46, 12);
+    const title = this.add.text(W / 2, panelY + 2, '⬆  CHARACTER PROGRESS', {
+      fontSize: '12px', fill: '#E7C870', fontFamily: 'Arial Black, Arial', fontStyle: 'bold', letterSpacing: 1
+    }).setOrigin(0.5).setAlpha(0).setDepth(15);
+    const objs = [pg, title];
+
+    deck.forEach((id, i) => {
+      const cd  = charData[id] || { level: 1, xp: 0 };
+      const pr  = xpProgress(cd.level || 1, cd.xp || 0);
+      const x   = 28 + (i % 2) * colW, y = panelY + 22 + Math.floor(i / 2) * rowH;
+      // portrait chip
+      const pKey = cardTexKey(this, id);
+      if (pKey) {
+        const img = this.add.image(x + 13, y + 12, pKey).setDepth(15).setAlpha(0);
+        const src = this.textures.get(pKey).getSourceImage();
+        const s = Math.min(26 / src.width, 30 / src.height);
+        img.setDisplaySize(src.width * s, src.height * s);
+        objs.push(img);
+      }
+      const nm = this.add.text(x + 30, y, `${CHARACTERS[id]?.name || id}  ·  Lv ${cd.level || 1}`, {
+        fontSize: '10px', fill: '#FFFFFF', fontFamily: 'Arial', fontStyle: 'bold'
+      }).setAlpha(0).setDepth(15);
+      // XP bar
+      const bw = colW - 44;
+      const bar = this.add.graphics().setDepth(15).setAlpha(0);
+      bar.fillStyle(0x1c2440, 1); bar.fillRoundedRect(x + 30, y + 14, bw, 8, 4);
+      bar.fillStyle(pr.pct >= 1 ? 0x44FF88 : 0x4FA8FF, 0.95);
+      bar.fillRoundedRect(x + 30, y + 14, Math.max(4, bw * pr.pct), 8, 4);
+      const pctT = this.add.text(x + 30 + bw, y + 4, pr.pct >= 1 ? 'MAX' : `${Math.round(pr.pct * 100)}%`, {
+        fontSize: '9px', fill: pr.pct >= 1 ? '#44FF88' : '#8FB4E8', fontFamily: 'Arial', fontStyle: 'bold'
+      }).setOrigin(1, 0).setAlpha(0).setDepth(15);
+      objs.push(nm, bar, pctT);
+    });
+
+    this.tweens.add({ targets: objs, alpha: 1, duration: 420 });
   }
 
   async _claimReward() {

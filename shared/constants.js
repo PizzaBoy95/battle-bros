@@ -63,7 +63,7 @@ const CHARACTERS = {
   titan_grunt: {
     id: 'titan_grunt', name: 'Titan Grunt', rarity: 'legendary',
     type: 'ground', hp: 2800, damage: 180, speed: 40,
-    attackSpeed: 0.67, range: 80, elixirCost: 6,
+    attackSpeed: 0.67, range: 52, elixirCost: 6,
     special: 'aoe_landing',
     specialDesc: 'Ground smash AoE on landing',
     color: 0x8B4513, accentColor: 0xC0C0C0
@@ -95,7 +95,7 @@ const CHARACTERS = {
   iron_bro: {
     id: 'iron_bro', name: 'Iron Bro', rarity: 'epic',
     type: 'ground', hp: 2200, damage: 140, speed: 50,
-    attackSpeed: 0.75, range: 75, elixirCost: 5,
+    attackSpeed: 0.75, range: 50, elixirCost: 5,
     special: 'shield_bash',
     specialDesc: 'Shield bash stuns target 1s',
     color: 0x2980B9, accentColor: 0x7F8C8D
@@ -103,7 +103,7 @@ const CHARACTERS = {
   stone_golem: {
     id: 'stone_golem', name: 'Stone Golem', rarity: 'epic',
     type: 'ground', hp: 3000, damage: 100, speed: 30,
-    attackSpeed: 0.5, range: 80, elixirCost: 6,
+    attackSpeed: 0.5, range: 52, elixirCost: 6,
     special: 'split_on_death',
     specialDesc: 'Immune to knockback; splits into 2 mini-golems on death',
     color: 0x7F8C8D, accentColor: 0x95A5A6
@@ -111,7 +111,7 @@ const CHARACTERS = {
   thunder_chief: {
     id: 'thunder_chief', name: 'Thunder Chief', rarity: 'epic',
     type: 'ground', hp: 1600, damage: 200, speed: 90,
-    attackSpeed: 1.1, range: 85, elixirCost: 4,
+    attackSpeed: 1.1, range: 54, elixirCost: 4,
     special: 'battle_cry',
     specialDesc: 'Battle cry buffs all nearby allies +20% damage for 3s',
     color: 0xE67E22, accentColor: 0xC0392B
@@ -127,7 +127,7 @@ const CHARACTERS = {
   wing_knight: {
     id: 'wing_knight', name: 'Wing Knight', rarity: 'rare',
     type: 'air', hp: 1400, damage: 160, speed: 85,
-    attackSpeed: 0.9, range: 80, elixirCost: 4,
+    attackSpeed: 0.9, range: 52, elixirCost: 4,
     special: 'dive_slam',
     specialDesc: 'Aerial dive slam on first attack',
     color: 0xECF0F1, accentColor: 0x2C3E50
@@ -143,7 +143,7 @@ const CHARACTERS = {
   jade_monk: {
     id: 'jade_monk', name: 'Jade Monk', rarity: 'rare',
     type: 'ground', hp: 1200, damage: 100, speed: 80,
-    attackSpeed: 0.9, range: 80, elixirCost: 3,
+    attackSpeed: 0.9, range: 52, elixirCost: 3,
     special: 'healing_aura',
     specialDesc: 'Heals nearest ally 50 HP/s while fighting',
     color: 0x27AE60, accentColor: 0x2ECC71
@@ -175,7 +175,7 @@ const CHARACTERS = {
   shadow_rogue: {
     id: 'shadow_rogue', name: 'Shadow Rogue', rarity: 'common',
     type: 'ground', hp: 700, damage: 240, speed: 110,
-    attackSpeed: 0.9, range: 80, elixirCost: 3,
+    attackSpeed: 0.9, range: 52, elixirCost: 3,
     special: 'backstab',
     specialDesc: '+50% crit damage from behind',
     color: 0x2D3436, accentColor: 0x636E72
@@ -215,7 +215,7 @@ const CHARACTERS = {
   forge_dwarf: {
     id: 'forge_dwarf', name: 'Forge Dwarf', rarity: 'common',
     type: 'ground', hp: 850, damage: 80, speed: 55,
-    attackSpeed: 0.7, range: 80, elixirCost: 3,
+    attackSpeed: 0.7, range: 52, elixirCost: 3,
     special: 'place_turret',
     specialDesc: 'Places a cannon turret that fires automatically',
     color: 0xE17055, accentColor: 0xFDCB6E
@@ -226,7 +226,7 @@ const CHARACTERS = {
 CHARACTERS._skeleton = {
   id: '_skeleton', name: 'Skeleton', rarity: 'common',
   type: 'ground', hp: 150, damage: 45, speed: 100,
-  attackSpeed: 1.0, range: 70, elixirCost: 0,
+  attackSpeed: 1.0, range: 46, elixirCost: 0,
   special: 'none', specialDesc: '',
   color: 0xF0E68C, accentColor: 0xFFFFFF
 };
