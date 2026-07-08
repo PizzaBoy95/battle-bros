@@ -2,15 +2,25 @@
 // place it while preserving aspect ratio.
 //
 // Priority:
-//   1. `${id}_art` — hand-authored vector (SVG) art   (CharacterArt.js)
-//   2. `${id}`     — imported sprite (Kenney CC0 PNG)  (public/assets/characters)
-//   3. (cards only) `${id}_p` — generated canvas portrait (CharacterGraphics.js)
+//   1. `${id}_port` — trimmed portrait generated from the imported animation
+//                     packs (public/assets/portraits/)
+//   2. `${id}_art`  — hand-authored vector (SVG) art  (legacy)
+//   3. `${id}`      — imported static sprite (legacy Kenney PNG)
+//   4. (cards only) `${id}_p` — generated canvas portrait
 //
 // Returns null when nothing exists, so callers fall back to DRAW_FUNCS.
 
+// Animation manifest (public/assets/heroes/manifest.json), set by BootScene
+// once loaded. Keys: charId → { anims: {idle/run/attack/death: {fw,fh,n}},
+// trim: {x,y,w,h,bottom}, tint, proj, boom }.
+let HERO_MANIFEST = {};
+export function setHeroManifest(m) { HERO_MANIFEST = m || {}; }
+export function heroAnim(id) { return HERO_MANIFEST[id] || null; }
+
 export function heroTexKey(scene, id) {
-  if (scene.textures.exists(id + '_art')) return id + '_art';
-  if (scene.textures.exists(id))          return id;
+  if (scene.textures.exists(id + '_port')) return id + '_port';
+  if (scene.textures.exists(id + '_art'))  return id + '_art';
+  if (scene.textures.exists(id))           return id;
   return null;
 }
 
@@ -19,10 +29,9 @@ export function cardTexKey(scene, id) {
 }
 
 // True when the resolved key is a full-body imported/vector sprite (not the
-// generated canvas portrait). Used to decide aspect-fit vs stretch-fill, and
-// whether the battle renderer should add procedural legs.
+// generated canvas portrait).
 export function isSpriteKey(key, id) {
-  return key === id + '_art' || key === id;
+  return key === id + '_port' || key === id + '_art' || key === id;
 }
 
 // Add an image, fitting inside (maxW, maxH). `fill` stretches to fill instead.

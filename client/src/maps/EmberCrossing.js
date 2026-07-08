@@ -1,240 +1,144 @@
-// Map 1: Ember Crossing — Volcanic arena with stone-arch bridges over lava river
+// Map 1: "Meadow Isles" — a grass island battlefield floating in the sea.
+// Built entirely from the Tiny Swords CC0 tile set (Pixel Frog): water,
+// foamed island edges, sand lane paths, wooden bridges over a central river,
+// trees, rocks and meadow decorations. (File keeps its original name so the
+// server map id 'ember_crossing' continues to work.)
+
+const T = 64;                 // tile size
+const COLS_PER_ROW = 10;      // tilemap_flat atlas layout
+
+// tilemap_flat frame indexes (10 per row)
+const G = {                    // grass block
+  TL: 0,  T: 1,  T2: 2,  TR: 3,
+  L: 10,  M: 11, M2: 12, R: 13,
+  BL: 30, B: 31, B2: 32, BR: 33
+};
+const S = { M: 16, M2: 17 };   // sand inner tiles
 
 export function drawMap(scene) {
   const { width: W, height: H } = scene.scale;
-  const CX = W / 2;
-  const RIVER_Y = H * 0.48;
-  const RIVER_H = 38;
+  const hasTiles = scene.textures.exists('tilemap_flat') && scene.textures.exists('water_tile');
+  if (!hasTiles) return _fallback(scene, W, H);
 
-  // ── Base background ──────────────────────────────────────────────────────────
-  const bg = scene.add.graphics().setDepth(0);
-  bg.fillStyle(0x0A0400); bg.fillRect(0, 0, W, H);
+  // ── Open sea underneath everything ────────────────────────────────────────
+  scene.add.tileSprite(W / 2, H / 2, W + 64, H + 64, 'water_tile').setDepth(0);
 
-  // ── Lava column flanks — multi-layer hot gradient ────────────────────────────
-  const lavaG = scene.add.graphics().setDepth(0);
-  [[0xFF3300, 62], [0xFF5500, 50], [0xFF7700, 36], [0xFFAA00, 22], [0xFFCC00, 10]].forEach(([c, w]) => {
-    lavaG.fillStyle(c, 0.82); lavaG.fillRect(0, 0, w, H);
-    lavaG.fillStyle(c, 0.82); lavaG.fillRect(W - w, 0, w, H);
-  });
-  lavaG.fillStyle(0xFFEE44, 0.40); lavaG.fillRect(16, 0, 10, H);
-  lavaG.fillStyle(0xFFEE44, 0.40); lavaG.fillRect(W - 26, 0, 10, H);
+  // Island geometry
+  const IX = 16;                       // island left edge
+  const ICOLS = 7;                     // 7 × 64 = 448 wide (fills 16..464)
+  const IY = 56;                       // island top edge
+  const IROWS = 12;                    // down to y = 824
+  const RIVER_ROW = 5;                 // river occupies this row (y 376..440)
+  const riverY = IY + RIVER_ROW * T;   // 376 — river band center ≈ 408
 
-  // ── Stone arena floor — two halves (ally=green tint top, enemy=red tint bottom) ──
-  const stoneG = scene.add.graphics().setDepth(1);
-  // Top half (enemy side) — scorched stone
-  stoneG.fillStyle(0x1E0E06); stoneG.fillRect(62, 0, W - 124, RIVER_Y);
-  stoneG.fillStyle(0x2A1206, 0.5); stoneG.fillRect(90, 0, W - 180, RIVER_Y);
-  // Bottom half (ally side) — ash grey stone
-  stoneG.fillStyle(0x181410); stoneG.fillRect(62, RIVER_Y + RIVER_H, W - 124, H - RIVER_Y - RIVER_H);
-  stoneG.fillStyle(0x222016, 0.5); stoneG.fillRect(90, RIVER_Y + RIVER_H, W - 180, H - RIVER_Y - RIVER_H);
+  // ── Foam ring around the island + river mouths (animated, under tiles) ───
+  if (scene.anims.exists('foam_anim')) {
+    const foamAt = (x, y) => {
+      const f = scene.add.sprite(x, y, 'foam').setDepth(0).setScale(0.75);
+      f.play({ key: 'foam_anim', startFrame: Math.floor(Math.random() * 8) });
+    };
+    for (let c = 0; c <= ICOLS; c += 2) {
+      foamAt(IX + c * T, IY + 6);                    // top edge
+      foamAt(IX + c * T, IY + IROWS * T - 6);        // bottom edge
+    }
+    for (let r = 1; r < IROWS; r += 2) {
+      foamAt(IX + 6, IY + r * T);                    // left edge
+      foamAt(IX + ICOLS * T - 6, IY + r * T);        // right edge
+    }
+    foamAt(IX + 40, riverY + T / 2); foamAt(IX + ICOLS * T - 40, riverY + T / 2);
+  }
 
-  // Brick mortar grid — top half
-  for (let row = 0; row <= Math.ceil(RIVER_Y / 18); row++) {
-    const ry = row * 18;
-    stoneG.fillStyle(0x000000, 0.14); stoneG.fillRect(62, ry, W - 124, 1);
-    const off = (row % 2) * 12;
-    for (let col = 0; col < Math.ceil((W - 124) / 28); col++) {
-      const vx = 62 + off + col * 28;
-      if (vx < W - 62) stoneG.fillRect(vx, ry, 1, 18);
+  // ── Island tiles ──────────────────────────────────────────────────────────
+  // Lane columns (sand paths) — lanes at x=160 and x=320 → island cols 2 and 4
+  const SAND_COLS = new Set([2, 4]);
+  const tileAt = (c, r, frame) =>
+    scene.add.image(IX + c * T + T / 2, IY + r * T + T / 2, 'tilemap_flat', frame).setDepth(1);
+
+  for (let r = 0; r < IROWS; r++) {
+    if (r === RIVER_ROW) continue;                   // river gap — water shows through
+    for (let c = 0; c < ICOLS; c++) {
+      let f;
+      const top = r === 0 || r === RIVER_ROW + 1;    // island top or river's south bank
+      const bot = r === IROWS - 1 || r === RIVER_ROW - 1; // island bottom or river's north bank
+      const lef = c === 0, rig = c === ICOLS - 1;
+      if      (top && lef) f = G.TL;
+      else if (top && rig) f = G.TR;
+      else if (bot && lef) f = G.BL;
+      else if (bot && rig) f = G.BR;
+      else if (top)        f = (c % 2) ? G.T : G.T2;
+      else if (bot)        f = (c % 2) ? G.B : G.B2;
+      else if (lef)        f = G.L;
+      else if (rig)        f = G.R;
+      else if (SAND_COLS.has(c)) f = ((c + r) % 2) ? S.M : S.M2;   // sand path
+      else                 f = ((c + r) % 2) ? G.M : G.M2;
+      tileAt(c, r, f);
     }
   }
-  // Brick mortar grid — bottom half
-  for (let row = 0; row <= Math.ceil((H - RIVER_Y - RIVER_H) / 18); row++) {
-    const ry = RIVER_Y + RIVER_H + row * 18;
-    stoneG.fillStyle(0x000000, 0.14); stoneG.fillRect(62, ry, W - 124, 1);
-    const off = (row % 2) * 12;
-    for (let col = 0; col < Math.ceil((W - 124) / 28); col++) {
-      const vx = 62 + off + col * 28;
-      if (vx < W - 62) stoneG.fillRect(vx, ry, 1, 18);
+
+  // ── Wooden bridges over the river (lanes) ─────────────────────────────────
+  if (scene.textures.exists('bridge_all')) {
+    for (const laneX of [IX + 2 * T + T / 2, IX + 4 * T + T / 2]) {
+      scene.add.image(laneX, riverY - T / 2 + 40, 'bridge_all', 3).setDepth(1); // north end
+      scene.add.image(laneX, riverY + T / 2,      'bridge_all', 6).setDepth(1); // span
+      scene.add.image(laneX, riverY + T + 24,     'bridge_all', 9).setDepth(1); // south end
     }
   }
 
-  // ── Perspective grid lines ────────────────────────────────────────────────────
-  const perspG = scene.add.graphics().setDepth(1);
-  const VPX = CX, VPY = H * 0.48;
-  perspG.lineStyle(1, 0x3A2010, 0.20);
-  const COLS = 7;
-  for (let i = 0; i <= COLS; i++) {
-    const bx = 62 + i * ((W - 124) / COLS);
-    perspG.lineBetween(bx, H, VPX + (bx - VPX) * 0.12, VPY);
-  }
-  for (let j = 0; j < 10; j++) {
-    const t = j / 10, yy = VPY + (H - VPY) * (t * t);
-    const xL = VPX - (VPX - 62) * (1 - t * 0.85);
-    const xR = VPX + (W - 62 - VPX) * (1 - t * 0.85);
-    perspG.lineStyle(1, 0x3A2010, 0.12 * (1 - t * 0.5));
-    perspG.lineBetween(xL, yy, xR, yy);
+  // ── Rocks bobbing in the sea ──────────────────────────────────────────────
+  if (scene.textures.exists('rocks_01')) {
+    [[W - 26, 180], [24, 520], [W - 30, 700]].forEach(([x, y], i) => {
+      scene.add.image(x, y, 'rocks_01', i % 3).setDepth(0).setScale(0.55);
+    });
   }
 
-  // ── Lava river at center ─────────────────────────────────────────────────────
-  const riverG = scene.add.graphics().setDepth(2);
-  [[0xFF3300, 0.9, 0], [0xFF5500, 0.8, 4], [0xFF7700, 0.7, 8], [0xFFAA00, 0.5, 12]].forEach(([c, a, shrink]) => {
-    riverG.fillStyle(c, a);
-    riverG.fillRect(62 + shrink, RIVER_Y, W - 124 - shrink * 2, RIVER_H);
-  });
-  riverG.fillStyle(0xFFEE44, 0.25); riverG.fillRect(62, RIVER_Y + 4, W - 124, RIVER_H - 8);
-
-  // ── Stone-arch bridge LEFT (spans lava river) ─────────────────────────────────
-  const bridgeG = scene.add.graphics().setDepth(3);
-  const BW = 68, BX_L = CX - 80 - BW / 2;
-  _drawArch(bridgeG, BX_L, RIVER_Y, BW, RIVER_H);
-
-  // ── Stone-arch bridge RIGHT ───────────────────────────────────────────────────
-  const BX_R = CX + 80 - BW / 2;
-  _drawArch(bridgeG, BX_R, RIVER_Y, BW, RIVER_H);
-
-  // ── Decorative broken pillars (corners of arena) ──────────────────────────────
-  const pillarG = scene.add.graphics().setDepth(2);
-  [[80, 100], [80, H - 100], [W - 80, 100], [W - 80, H - 100]].forEach(([px, py]) => {
-    pillarG.fillStyle(0x2A1A0A); pillarG.fillRect(px - 10, py - 32, 20, 64);
-    pillarG.fillStyle(0x3A2A14); pillarG.fillRect(px - 8, py - 30, 16, 60);
-    pillarG.fillStyle(0x4A3A1E, 0.5); pillarG.fillRect(px - 6, py - 30, 6, 60);
-    pillarG.fillStyle(0x2A1A0A); pillarG.fillRect(px - 14, py - 38, 28, 10);
-    pillarG.fillStyle(0x2A1A0A); pillarG.fillRect(px - 14, py + 26, 28, 10);
-    // Top broken off — offset slab
-    pillarG.fillStyle(0x1A0E06); pillarG.fillRect(px - 8, py - 50, 14, 14);
-  });
-
-  // ── Torch posts at four bridge ends ──────────────────────────────────────────
-  const torchG = scene.add.graphics().setDepth(3);
-  [BX_L, BX_L + BW, BX_R, BX_R + BW].forEach(tx => {
-    // Post
-    torchG.fillStyle(0x3A2010); torchG.fillRect(tx - 3, RIVER_Y - 28, 6, 26);
-    // Torch cup
-    torchG.fillStyle(0x6A4020); torchG.fillRect(tx - 6, RIVER_Y - 36, 12, 10);
-    // Flame
-    torchG.fillStyle(0xFF8800, 0.85); torchG.fillCircle(tx, RIVER_Y - 40, 7);
-    torchG.fillStyle(0xFFCC00, 0.70); torchG.fillCircle(tx, RIVER_Y - 44, 4);
-    torchG.fillStyle(0xFFEE88, 0.55); torchG.fillCircle(tx - 1, RIVER_Y - 47, 2);
-  });
-
-  // ── Lava glow bleed inward ────────────────────────────────────────────────────
-  const glowG = scene.add.graphics().setDepth(1);
-  glowG.fillStyle(0xFF5500, 0.09); glowG.fillRect(62, 0, 30, H);
-  glowG.fillStyle(0xFF5500, 0.09); glowG.fillRect(W - 92, 0, 30, H);
-
-  // ── Lava bubble static dots ───────────────────────────────────────────────────
-  const bubG = scene.add.graphics().setDepth(2);
-  for (let i = 0; i < 14; i++) {
-    const lx = 5 + Math.abs(Math.sin(i * 97.3)) * 46;
-    const ly = (i / 14) * H + Math.sin(i * 1.7) * 18;
-    const lr = 2 + Math.abs(Math.sin(i * 13)) * 3;
-    bubG.fillStyle(0xFFDD00, 0.55); bubG.fillCircle(lx, ly, lr);
-    bubG.fillStyle(0xFFFFAA, 0.25); bubG.fillCircle(lx - lr * 0.3, ly - lr * 0.3, lr * 0.4);
-    const rx = W - 5 - Math.abs(Math.sin(i * 97.3)) * 46;
-    bubG.fillStyle(0xFFDD00, 0.55); bubG.fillCircle(rx, ly + 10, lr);
-    bubG.fillStyle(0xFFFFAA, 0.25); bubG.fillCircle(rx + lr * 0.3, ly + 10 - lr * 0.3, lr * 0.4);
+  // ── Trees along the island flanks ─────────────────────────────────────────
+  if (scene.textures.exists('tree')) {
+    [[52, 150], [W - 52, 250], [52, 560], [W - 52, 640]].forEach(([x, y]) => {
+      scene.add.image(x, y, 'tree', 0).setDepth(2).setScale(0.62);
+    });
   }
 
-  // ── Edge scorching — dark char marks along lava border ───────────────────────
-  const charG = scene.add.graphics().setDepth(2);
-  charG.fillStyle(0x000000, 0.35); charG.fillRect(62, 0, 18, H);
-  charG.fillStyle(0x000000, 0.35); charG.fillRect(W - 80, 0, 18, H);
+  // ── Meadow decorations (bushes, flowers, mushrooms, pumpkins) ─────────────
+  const deco = ['deco_01', 'deco_02', 'deco_03', 'deco_04', 'deco_05', 'deco_06',
+                'deco_07', 'deco_08', 'deco_09', 'deco_10', 'deco_14'];
+  const spots = [[105, 120], [370, 135], [220, 250], [60, 320], [415, 330],
+                 [90, 500], [390, 520], [225, 590], [70, 730], [410, 750], [240, 320]];
+  spots.forEach(([x, y], i) => {
+    const key = deco[i % deco.length];
+    if (scene.textures.exists(key)) scene.add.image(x, y, key).setDepth(1).setScale(0.9);
+  });
 
-  // ── Vignette ──────────────────────────────────────────────────────────────────
+  // ── A happy sheep or two near the kings ───────────────────────────────────
+  if (scene.anims.exists('sheep_anim')) {
+    [[168, 796], [318, 66]].forEach(([x, y]) => {
+      const sh = scene.add.sprite(x, y, 'sheep').setDepth(2).setScale(0.55);
+      sh.play({ key: 'sheep_anim', startFrame: Math.floor(Math.random() * 6) });
+    });
+  }
+
+  // ── Soft vignette top/bottom for HUD readability ──────────────────────────
   const vigG = scene.add.graphics().setDepth(3);
-  vigG.fillStyle(0x000000, 0.36); vigG.fillRect(0, 0, W, 100);
-  vigG.fillStyle(0x000000, 0.22); vigG.fillRect(0, H - 100, W, 100);
+  vigG.fillStyle(0x000000, 0.30); vigG.fillRect(0, 0, W, 84);
+  vigG.fillStyle(0x000000, 0.18); vigG.fillRect(0, H - 96, W, 96);
 
-  // ── Animated lava river + columns ─────────────────────────────────────────────
-  const animG = scene.add.graphics().setDepth(2);
-  _startLavaAnimation(scene, animG, W, H, RIVER_Y, RIVER_H);
+  return null;
+}
 
+// Minimal fallback if the tile assets failed to load
+function _fallback(scene, W, H) {
+  const bg = scene.add.graphics().setDepth(0);
+  bg.fillStyle(0x3E7C4F); bg.fillRect(0, 0, W, H);
+  bg.fillStyle(0x2E6ABF); bg.fillRect(0, H * 0.47, W, 40);
   return bg;
 }
 
-function _drawArch(g, bx, ry, bw, rh) {
-  // Shadow below bridge
-  g.fillStyle(0x000000, 0.35); g.fillRect(bx - 2, ry, bw + 4, rh);
-  // Bridge deck — 3-layer stone
-  g.fillStyle(0x3A2010); g.fillRect(bx, ry - 4, bw, rh + 4);
-  g.fillStyle(0x4A2E18); g.fillRect(bx + 2, ry - 2, bw - 4, rh);
-  g.fillStyle(0x5A3A20, 0.5); g.fillRect(bx + 4, ry - 2, bw * 0.3, rh);
-  // Top rail
-  g.fillStyle(0x5A3A22); g.fillRect(bx, ry - 10, bw, 8);
-  g.fillStyle(0x7A5230, 0.6); g.fillRect(bx + 2, ry - 9, bw - 4, 5);
-  // Bottom rail
-  g.fillStyle(0x3A2010); g.fillRect(bx, ry + rh, bw, 8);
-  // Arch pillars on sides
-  g.fillStyle(0x2A1808); g.fillRect(bx, ry, 10, rh + 4);
-  g.fillStyle(0x2A1808); g.fillRect(bx + bw - 10, ry, 10, rh + 4);
-  // Plank lines across deck
-  g.lineStyle(1, 0x5C3A1E, 0.35);
-  for (let xi = bx + 8; xi < bx + bw - 8; xi += 14) {
-    g.lineBetween(xi, ry - 2, xi, ry + rh);
-  }
-  // Stone keystone triangle (arch aesthetic)
-  g.fillStyle(0x6A4020, 0.7);
-  g.fillTriangle(bx + bw / 2 - 8, ry + rh, bx + bw / 2 + 8, ry + rh, bx + bw / 2, ry + rh - 14);
-}
-
-function _startLavaAnimation(scene, g, W, H, RIVER_Y, RIVER_H) {
-  let t = 0;
-  scene.time.addEvent({
-    delay: 75, loop: true,
-    callback: () => {
-      g.clear();
-      t += 0.05;
-
-      // Flowing streaks — lava columns
-      for (let i = 0; i < 5; i++) {
-        const yPos = ((t * 0.5 + i * 0.22) % 1) * H;
-        const alpha = 0.20 + Math.sin(t * 2 + i) * 0.08;
-        g.fillStyle(0xFFCC00, alpha); g.fillRect(6, yPos, 48, 3);
-      }
-      for (let i = 0; i < 5; i++) {
-        const yPos = ((t * 0.5 + i * 0.22 + 0.5) % 1) * H;
-        const alpha = 0.20 + Math.sin(t * 2 + i + 1) * 0.08;
-        g.fillStyle(0xFFCC00, alpha); g.fillRect(W - 54, yPos, 48, 3);
-      }
-
-      // Pulsing glow core
-      const pulse = 0.20 + Math.sin(t * 3) * 0.08;
-      g.fillStyle(0xFFEE44, pulse); g.fillRect(16, 0, 8, H);
-      g.fillStyle(0xFFEE44, pulse * 0.8); g.fillRect(W - 24, 0, 8, H);
-
-      // Rising bubbles — columns
-      for (let i = 0; i < 4; i++) {
-        const phase = (t * 0.45 + i * 0.28) % 1;
-        const bx = 8 + Math.abs(Math.sin(i * 2.1)) * 36;
-        const by = H * (1 - phase);
-        g.fillStyle(0xFFEE66, 0.52 - phase * 0.42); g.fillCircle(bx, by, 2 + Math.sin(i) * 1.5);
-      }
-      for (let i = 0; i < 4; i++) {
-        const phase = (t * 0.45 + i * 0.28 + 0.5) % 1;
-        const bx = W - 8 - Math.abs(Math.sin(i * 2.1)) * 36;
-        const by = H * (1 - phase);
-        g.fillStyle(0xFFEE66, 0.52 - phase * 0.42); g.fillCircle(bx, by, 2 + Math.sin(i + 1) * 1.5);
-      }
-
-      // Lava river animated flow + bubbles
-      const rPulse = 0.22 + Math.sin(t * 4) * 0.10;
-      g.fillStyle(0xFFAA00, rPulse); g.fillRect(62, RIVER_Y + 6, W - 124, RIVER_H - 12);
-      // River bubbles
-      for (let i = 0; i < 6; i++) {
-        const phase = (t * 0.6 + i * 0.18) % 1;
-        const bx = 70 + phase * (W - 140);
-        const by = RIVER_Y + 6 + Math.sin(t * 3 + i) * (RIVER_H * 0.3);
-        g.fillStyle(0xFFEE44, 0.55); g.fillCircle(bx, by, 2.5 + Math.sin(i * 1.7) * 1.2);
-      }
-
-      // Torch flame flicker
-      const flicker = 0.6 + Math.sin(t * 8) * 0.2;
-      g.fillStyle(0xFF8800, flicker * 0.85);
-    }
-  });
-}
-
 export const MAP_CONFIG = {
-  id: 'ember_crossing',
-  name: 'Ember Crossing',
-  bgColor: 0x0A0400,
-  hazardType: 'lava',
-  hazardDPS: 30,
-  hazardZones: [
-    { x: 0, y: 0, width: 62, height: 854 },
-    { x: 418, y: 0, width: 62, height: 854 }
-  ],
+  id: 'ember_crossing',          // keep server id
+  name: 'Meadow Isles',
+  bgColor: 0x47ABCE,
+  hazardType: null,
+  hazardDPS: 0,
+  hazardZones: [],
   battleTrack: 'ember_rush',
-  ambientColor: 0xFF4400
+  ambientColor: 0x7EC850
 };

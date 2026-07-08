@@ -5,7 +5,7 @@ import { ElixirSystem } from '../systems/ElixirSystem.js';
 import { BattleTimer } from '../systems/BattleTimer.js';
 import { CHARACTERS, CHARACTER_IDS, RARITY_COLORS } from '../characters/CharacterRegistry.js';
 import { DRAW_FUNCS } from '../characters/CharacterGraphics.js';
-import { heroTexKey } from '../characters/heroTex.js';
+import { heroTexKey, cardTexKey, heroAnim } from '../characters/heroTex.js';
 import * as EmberCrossing from '../maps/EmberCrossing.js';
 import * as FrostpeakArena from '../maps/FrostpeakArena.js';
 
@@ -133,6 +133,7 @@ export class BattleScene extends Phaser.Scene {
 
   _buildTowers() {
     this.towerObjects = {};
+    const useSprites = this.textures.exists('castle_blue') && this.textures.exists('tower_blue');
 
     for (const playerKey of ['p1', 'p2']) {
       this.towerObjects[playerKey] = {};
@@ -140,85 +141,32 @@ export class BattleScene extends Phaser.Scene {
         const pos = TOWER_POSITIONS[playerKey][towerKey];
         const isKing = towerKey === 'king';
         const isEnemy = playerKey !== this.myKey;
+        const tw = isKing ? 58 : 44;
 
+        // Ground shadow
         const g = this.add.graphics().setDepth(2);
-        const tw = isKing ? 58 : 44, th = isKing ? 80 : 60;
-        const SIDE = 9; // depth illusion thickness
+        g.fillStyle(0x000000, 0.25);
+        g.fillEllipse(pos.x, pos.y + 18, tw + 44, 16);
 
-        // Ground shadow ellipse
-        g.fillStyle(0x000000, 0.30);
-        g.fillEllipse(pos.x + SIDE / 2, pos.y + 16, tw + 28, 14);
-
-        // Right-side depth face (darker)
-        const sideCol = isEnemy ? 0x641A11 : 0x10304A;
-        g.fillStyle(sideCol);
-        g.fillRect(pos.x + tw / 2, pos.y - th + 10, SIDE, th + 6);
-
-        // Main tower body
-        const bodyCol = isEnemy ? 0xA93226 : 0x2471A3;
-        g.fillStyle(bodyCol);
-        g.fillRect(pos.x - tw / 2, pos.y - th + 10, tw, th);
-
-        // Stone brick texture
-        g.fillStyle(0x000000, 0.10);
-        for (let row = 0; row < Math.floor(th / 10); row++) {
-          const ry = pos.y - th + 10 + row * 10;
-          g.fillRect(pos.x - tw / 2, ry, tw, 1);
-          const offset = (row % 2) * 10;
-          for (let col = 0; col < 5; col++) {
-            g.fillRect(pos.x - tw / 2 + offset + col * 20, ry, 1, 10);
-          }
+        // Castle (king) / stone tower (guards) — Tiny Swords CC0 art
+        let img = null;
+        if (useSprites) {
+          const tex = (isKing ? 'castle_' : 'tower_') + (isEnemy ? 'red' : 'blue');
+          img = this.add.image(pos.x, pos.y + 28, tex).setOrigin(0.5, 1).setDepth(2);
+          img.setScale(isKing ? 0.52 : 0.56);
         }
-
-        // Highlight strip (left edge — light source from left)
-        g.fillStyle(0xFFFFFF, 0.14);
-        g.fillRect(pos.x - tw / 2, pos.y - th + 10, 3, th);
-
-        // Battlements
-        const merCol  = isEnemy ? 0x871E18 : 0x1A4A72;
-        const merSide = isEnemy ? 0x621610 : 0x123654;
-        const slotW = Math.floor(tw / 4);
-        for (let i = 0; i < 4; i++) {
-          const bx = pos.x - tw / 2 + i * slotW;
-          g.fillStyle(merCol);
-          g.fillRect(bx, pos.y - th, slotW - 4, 15);
-          g.fillStyle(merSide);
-          g.fillRect(bx + slotW - 4, pos.y - th, SIDE / 2 + 1, 15);
-          g.fillStyle(0xFFFFFF, 0.12);
-          g.fillRect(bx, pos.y - th, 2, 15);
-        }
-
-        // Base platform
-        const baseCol = isEnemy ? 0x5A1911 : 0x0E2A3D;
-        g.fillStyle(baseCol);
-        g.fillRect(pos.x - tw / 2 - 5, pos.y + 8, tw + 10 + SIDE, 12);
-
-        // King tower crown
-        if (isKing) {
-          g.fillStyle(0xD4AC0D);
-          g.fillTriangle(pos.x - 13, pos.y - th - 2, pos.x, pos.y - th - 18, pos.x + 13, pos.y - th - 2);
-          g.fillStyle(0xFFD700);
-          g.fillTriangle(pos.x - 11, pos.y - th - 3, pos.x, pos.y - th - 15, pos.x + 11, pos.y - th - 3);
-          g.fillStyle(0xFFEE88, 0.5);
-          g.fillTriangle(pos.x - 7, pos.y - th - 3, pos.x - 1, pos.y - th - 13, pos.x + 3, pos.y - th - 3);
-        }
-
-        // Archer silhouette on top
-        const archerCol = isEnemy ? 0xFF7777 : 0x77CCFF;
-        g.fillStyle(archerCol, 0.85);
-        g.fillCircle(pos.x, pos.y - th - 5, 5);
-        g.fillRect(pos.x - 3, pos.y - th + 1, 6, 9);
 
         // HP bar
         const maxHp = isKing ? TOWER_MAX.king : TOWER_MAX.guard;
-        const hpBg  = this.add.rectangle(pos.x + SIDE / 2, pos.y + 22, tw + 8, 8, 0x0a0a0a).setDepth(3);
-        const hpBar = this.add.rectangle(pos.x + SIDE / 2, pos.y + 22, tw + 4, 6, isEnemy ? 0xE74C3C : 0x27AE60)
+        const hpBg  = this.add.rectangle(pos.x, pos.y + 26, tw + 8, 8, 0x0a0a0a).setDepth(3);
+        const hpBar = this.add.rectangle(pos.x, pos.y + 26, tw + 4, 6, isEnemy ? 0xE74C3C : 0x27AE60)
           .setDepth(4).setOrigin(0.5);
-        const hpText = this.add.text(pos.x + SIDE / 2, pos.y + 34, String(maxHp), {
-          fontSize: '10px', fill: '#FFFFFF', fontFamily: 'Arial'
+        const hpText = this.add.text(pos.x, pos.y + 38, String(maxHp), {
+          fontSize: '10px', fill: '#FFFFFF', fontFamily: 'Arial', stroke: '#000', strokeThickness: 2
         }).setOrigin(0.5).setDepth(4);
 
-        this.towerObjects[playerKey][towerKey] = { g, hpBg, hpBar, hpText, pos, tw, th, isKing, state: 'full' };
+        this.towerObjects[playerKey][towerKey] =
+          { g, img, hpBg, hpBar, hpText, pos, tw, th: isKing ? 80 : 60, isKing, isEnemy, state: 'full', fires: [] };
       }
     }
   }
@@ -293,12 +241,12 @@ export class BattleScene extends Phaser.Scene {
     const h = b.maxY - b.minY;
     this._deployZoneG = this.add.graphics().setDepth(1).setAlpha(0);
     this._deployZoneG.fillStyle(0x00FF88);
-    this._deployZoneG.fillRect(62, b.minY, W - 124, h);
+    this._deployZoneG.fillRect(24, b.minY, W - 48, h);
     // Dashed boundary line at the river edge (the limit of your half)
     this._deployEdgeG = this.add.graphics().setDepth(2).setAlpha(0.5);
     const edgeY = this.myKey === 'p1' ? b.minY : b.maxY;
     this._deployEdgeG.lineStyle(2, 0x00FFAA, 0.5);
-    for (let x = 64; x < W - 64; x += 22) {
+    for (let x = 28; x < W - 28; x += 22) {
       this._deployEdgeG.lineBetween(x, edgeY, x + 12, edgeY);
     }
     // Zone label
@@ -492,11 +440,19 @@ export class BattleScene extends Phaser.Scene {
     if (!card) return;
 
     // Ghost unit follows pointer
-    this._ghostG = this.add.graphics().setDepth(22).setAlpha(0.75);
-    const fn = DRAW_FUNCS[card.charId];
-    if (fn) fn(this._ghostG);
-    this._ghostG.setScale(0.68);
-    this._ghostG.setPosition(ptr.x, ptr.y);
+    const gKey = cardTexKey(this, card.charId);
+    if (gKey) {
+      this._ghostG = this.add.image(ptr.x, ptr.y, gKey).setDepth(22).setAlpha(0.8);
+      const src = this.textures.get(gKey).getSourceImage();
+      const s = 74 / Math.max(src.width, src.height);
+      this._ghostG.setScale(s);
+    } else {
+      this._ghostG = this.add.graphics().setDepth(22).setAlpha(0.75);
+      const fn = DRAW_FUNCS[card.charId];
+      if (fn) fn(this._ghostG);
+      this._ghostG.setScale(0.68);
+      this._ghostG.setPosition(ptr.x, ptr.y);
+    }
 
     // Brighten deploy zone
     this._deployZoneG?.setAlpha(0.22);
@@ -538,7 +494,7 @@ export class BattleScene extends Phaser.Scene {
 
   _inMyDeployZone(x, y) {
     const b = this._deployBounds();
-    return x >= 56 && x <= this.scale.width - 56 && y >= b.minY && y <= b.maxY;
+    return x >= 24 && x <= this.scale.width - 24 && y >= b.minY && y <= b.maxY;
   }
 
   // Fallback: tap on map directly while card selected (no drag)
@@ -624,88 +580,41 @@ export class BattleScene extends Phaser.Scene {
 
   _redrawTower(playerKey, towerKey, state) {
     const tObj = this.towerObjects?.[playerKey]?.[towerKey];
-    if (!tObj) return;
-    const { pos, tw, th, isKing } = tObj;
-    const isEnemy = playerKey !== this.myKey;
-    const g = tObj.g;
-    g.clear();
+    if (!tObj || !tObj.img) return;
+    const { pos, img, isKing, isEnemy } = tObj;
+
+    // Clear any fire overlays from a previous state
+    tObj.fires.forEach(f => f.destroy());
+    tObj.fires = [];
 
     if (state === 'destroyed') {
-      // Rubble pile
-      g.fillStyle(0x000000, 0.35); g.fillEllipse(pos.x + 4, pos.y + 14, tw + 30, 16);
-      const rubbleCol = isEnemy ? 0x7A1E16 : 0x1A3A5A;
-      const rubbleDk  = isEnemy ? 0x4A0E0A : 0x0E2040;
-      g.fillStyle(rubbleDk); g.fillEllipse(pos.x, pos.y + 10, tw + 16, 18);
-      for (let i = 0; i < 6; i++) {
-        const rx = pos.x - tw * 0.4 + i * (tw * 0.16);
-        const ry = pos.y + 2 + (i % 2) * 8;
-        g.fillStyle(rubbleCol); g.fillRect(rx, ry, 10 + i * 2, 8);
-      }
-      g.fillStyle(rubbleDk, 0.6); g.fillRect(pos.x - 10, pos.y - 18, 20, 26);
-      g.fillStyle(0x444444, 0.4); g.fillEllipse(pos.x, pos.y + 6, tw * 0.6, 10);
+      // Swap to the destroyed rubble art (castle rubble fits both sizes)
+      img.setTexture(isKing ? 'castle_destroyed' : 'tower_destroyed');
+      img.clearTint();
       return;
     }
 
-    const SIDE = 9;
-    const sideCol = isEnemy ? 0x641A11 : 0x10304A;
-    const bodyCol = isEnemy ? 0xA93226 : 0x2471A3;
-    const merCol  = isEnemy ? 0x871E18 : 0x1A4A72;
-    const merSide = isEnemy ? 0x621610 : 0x123654;
-    const baseCol = isEnemy ? 0x5A1911 : 0x0E2A3D;
-
-    // Ground shadow
-    g.fillStyle(0x000000, 0.30); g.fillEllipse(pos.x + SIDE / 2, pos.y + 16, tw + 28, 14);
-    // Side depth
-    g.fillStyle(sideCol); g.fillRect(pos.x + tw / 2, pos.y - th + 10, SIDE, th + 6);
-    // Body
-    g.fillStyle(bodyCol); g.fillRect(pos.x - tw / 2, pos.y - th + 10, tw, th);
-    // Bricks
-    g.fillStyle(0x000000, 0.10);
-    for (let row = 0; row < Math.floor(th / 10); row++) {
-      const ry = pos.y - th + 10 + row * 10;
-      g.fillRect(pos.x - tw / 2, ry, tw, 1);
-      const offset = (row % 2) * 10;
-      for (let col = 0; col < 5; col++) g.fillRect(pos.x - tw / 2 + offset + col * 20, ry, 1, 10);
-    }
-    // Highlight
-    g.fillStyle(0xFFFFFF, 0.14); g.fillRect(pos.x - tw / 2, pos.y - th + 10, 3, th);
-
-    // Damage cracks (damaged state)
     if (state === 'damaged') {
-      g.lineStyle(2, 0x000000, 0.55);
-      g.strokeRect(pos.x - tw / 2 + 8, pos.y - th + 14, 12, 22);
-      g.strokeRect(pos.x - tw / 2 + 24, pos.y - th + 30, 14, 18);
-      g.fillStyle(0x000000, 0.22); g.fillRect(pos.x - tw / 2 + 8, pos.y - th + 14, 12, 22);
-      // crumbled merlon gap — only draw 3 of 4 battlements
+      // Scorched tint + burning fires on the structure
+      img.setTint(0xB59B8A);
+      if (this.anims.exists('fire_anim')) {
+        const spots = isKing
+          ? [[-30, -66], [24, -44]]
+          : [[0, -60]];
+        for (const [dx, dy] of spots) {
+          const f = this.add.sprite(pos.x + dx, pos.y + dy, 'fire')
+            .setDepth(3).setScale(0.42).setAlpha(0.95);
+          f.play('fire_anim');
+          tObj.fires.push(f);
+        }
+      }
+      this._addTowerSmoke(pos);
+      return;
     }
 
-    // Battlements (skip last if damaged)
-    const merlonCount = state === 'damaged' ? 3 : 4;
-    const slotW = Math.floor(tw / 4);
-    for (let i = 0; i < merlonCount; i++) {
-      const bx = pos.x - tw / 2 + i * slotW;
-      g.fillStyle(merCol);   g.fillRect(bx, pos.y - th, slotW - 4, 15);
-      g.fillStyle(merSide);  g.fillRect(bx + slotW - 4, pos.y - th, SIDE / 2 + 1, 15);
-      g.fillStyle(0xFFFFFF, 0.12); g.fillRect(bx, pos.y - th, 2, 15);
-    }
-    // Base
-    g.fillStyle(baseCol); g.fillRect(pos.x - tw / 2 - 5, pos.y + 8, tw + 10 + SIDE, 12);
-    // King crown
-    if (isKing) {
-      g.fillStyle(0xD4AC0D);
-      g.fillTriangle(pos.x - 13, pos.y - th - 2, pos.x, pos.y - th - 18, pos.x + 13, pos.y - th - 2);
-      g.fillStyle(0xFFD700);
-      g.fillTriangle(pos.x - 11, pos.y - th - 3, pos.x, pos.y - th - 15, pos.x + 11, pos.y - th - 3);
-    }
-    // Archer (hidden when damaged)
-    if (state !== 'damaged') {
-      const archerCol = isEnemy ? 0xFF7777 : 0x77CCFF;
-      g.fillStyle(archerCol, 0.85);
-      g.fillCircle(pos.x, pos.y - th - 5, 5);
-      g.fillRect(pos.x - 3, pos.y - th + 1, 6, 9);
-    }
-    // Damage smoke (start emitter for damaged state)
-    if (state === 'damaged') this._addTowerSmoke(pos);
+    // full
+    img.setTexture((isKing ? 'castle_' : 'tower_') + (isEnemy ? 'red' : 'blue'));
+    img.clearTint();
   }
 
   _playTowerCrumble(pos, isDestroy) {
@@ -750,7 +659,7 @@ export class BattleScene extends Phaser.Scene {
     // Remove dead units
     for (const [id, uObj] of Object.entries(this.unitGraphics)) {
       if (!serverIds.has(id)) {
-        this._playDeathFX(uObj.dispX, uObj.dispY);
+        this._playDeathFX(uObj.dispX, uObj.dispY, uObj);
         uObj.g.destroy();
         uObj.tintG?.destroy();
         uObj.shadowG?.destroy();
@@ -785,20 +694,34 @@ export class BattleScene extends Phaser.Scene {
     const isAir   = char.type === 'air';
     const isMe    = u.owner === this.myKey;
 
-    // Hero sprite (Kenney CC0 / hand-authored vector) if available, else DRAW_FUNCS
-    const texKey   = heroTexKey(this, u.charId);
+    // Animated hero pack (imported spritesheets) takes priority,
+    // then static hero image, then procedural DRAW_FUNCS.
+    const anim     = heroAnim(u.charId);
+    const isSheet  = !!(anim && anim.anims?.run && this.anims.exists(`${u.charId}_run`));
+    const texKey   = isSheet ? null : heroTexKey(this, u.charId);
     const isSprite = !!texKey;
 
     // Dynamic ground shadow + team ring (behind everything)
     const shadowG = this.add.graphics().setDepth(3);
     // Procedural legs only for code-drawn ground units (sprites have their own legs)
-    const legG    = (isAir || isSprite) ? null : this.add.graphics().setDepth(4);
+    const legG    = (isAir || isSprite || isSheet) ? null : this.add.graphics().setDepth(4);
     // Team ring at feet
     const tintG   = this.add.graphics().setDepth(4).setAlpha(0.75);
 
     // Body
     let g, baseScale;
-    if (isSprite) {
+    if (isSheet) {
+      const t = anim.trim || { y: 0, h: anim.anims.idle?.fh || 100, w: 40 };
+      const fh = anim.anims.run.fh;
+      // Feet line inside the frame → origin so unit y = feet
+      const originY = Math.min(0.98, (t.y + t.h) / fh);
+      g = this.add.sprite(u.x, u.y, `${u.charId}_run`).setOrigin(0.5, originY).setDepth(5);
+      g.play(`${u.charId}_run`);
+      const TARGET_H = isAir ? 54 : 62;       // on-screen character height
+      baseScale = TARGET_H / Math.max(20, t.h);
+      if (anim.tint) g.setTint(anim.tint);
+      if (!isMe) g.setFlipX(true);            // packs face right; enemies face left
+    } else if (isSprite) {
       g = this.add.image(u.x, u.y, texKey).setOrigin(0.5, 0.82).setDepth(5);
       const srcH = this.textures.get(texKey).getSourceImage().height || 64;
       baseScale = 60 / srcH;                  // render ~60px tall
@@ -817,8 +740,9 @@ export class BattleScene extends Phaser.Scene {
 
     this.unitGraphics[u.id] = {
       g, tintG, shadowG, legG, hpBg, hpBar,
-      charId: u.charId, char, isAir, isMe, isSprite, baseScale,
-      barOff: isSprite ? 56 : 34,
+      charId: u.charId, char, isAir, isMe, isSprite, isSheet, baseScale,
+      barOff: isSheet ? 72 : isSprite ? 56 : 34,
+      attackUntil: 0,                       // time until attack anim finishes
       color: char.color ?? 0x888888, accent: char.accentColor ?? 0xCCCCCC,
       tx: u.x, ty: u.y, dispX: u.x, dispY: u.y,
       hp: u.hp, maxHp: u.maxHp, state: u.state,
@@ -863,7 +787,17 @@ export class BattleScene extends Phaser.Scene {
 
       // ── Vertical motion ──────────────────────────────────────────────────
       let bob, sqStretch;
-      if (o.isAir) {
+      if (o.isSheet) {
+        // Real frame animation handles gait — only air units hover
+        bob = o.isAir ? Math.sin(ph * 1.6) * 5 : 0;
+        sqStretch = 1;
+        // Swap run/idle based on movement (attack anim takes priority)
+        if (time > o.attackUntil) {
+          const want = isMoving ? `${o.charId}_run`
+            : (this.anims.exists(`${o.charId}_idle`) ? `${o.charId}_idle` : `${o.charId}_run`);
+          if (o.g.anims?.currentAnim?.key !== want) o.g.play(want, true);
+        }
+      } else if (o.isAir) {
         bob = Math.sin(ph * 1.6) * 5;          // gentle hover
         sqStretch = 1 + Math.sin(ph * 1.6) * 0.03;
       } else if (isMoving) {
@@ -907,7 +841,8 @@ export class BattleScene extends Phaser.Scene {
       }
 
       // ── Body transform ───────────────────────────────────────────────────
-      const lean = (isMoving && !o.isAir ? Math.sin(ph * 0.5) * 0.045 : Math.sin(ph) * 0.02);
+      const lean = o.isSheet ? 0
+        : (isMoving && !o.isAir ? Math.sin(ph * 0.5) * 0.045 : Math.sin(ph) * 0.02);
       const bs = o.baseScale * depthSc;
       o.g.setPosition(bx, by + bob);
       o.g.setScale(bs, bs * sqStretch);
@@ -940,6 +875,14 @@ export class BattleScene extends Phaser.Scene {
     const d = Math.hypot(dx, dy) || 1;
     best.lungeX = (dx / d) * 8;
     best.lungeY = (dy / d) * 8;
+
+    // Real attack animation (imported packs) — face the target, swing, resume
+    if (best.isSheet && this.anims.exists(`${best.charId}_attack`)) {
+      best.g.setFlipX(dx < 0);
+      const animObj = this.anims.get(`${best.charId}_attack`);
+      best.attackUntil = this.time.now + (animObj?.duration || 500);
+      best.g.play(`${best.charId}_attack`, true);
+    }
   }
 
   // Target gets shoved away from the attacker (knockback decays in update)
@@ -956,7 +899,20 @@ export class BattleScene extends Phaser.Scene {
     this.tweens.add({ targets: o.g, alpha: 1, duration: 140 });
   }
 
-  _playDeathFX(x, y) {
+  _playDeathFX(x, y, uObj = null) {
+    // Real death animation from the imported pack, if the unit has one
+    if (uObj?.isSheet && this.anims.exists(`${uObj.charId}_death`)) {
+      const d = this.add.sprite(x, y, `${uObj.charId}_death`).setDepth(5);
+      d.setOrigin(uObj.g.originX, uObj.g.originY);
+      d.setScale(uObj.g.scaleX, uObj.g.scaleY);
+      d.setFlipX(uObj.g.flipX);
+      if (uObj.g.tintTopLeft !== 0xffffff) d.setTint(uObj.g.tintTopLeft);
+      d.play(`${uObj.charId}_death`);
+      d.once('animationcomplete', () => {
+        this.tweens.add({ targets: d, alpha: 0, duration: 420, onComplete: () => d.destroy() });
+      });
+    }
+
     // Modern shockwave ring
     const ring = this.add.graphics().setDepth(15);
     ring.lineStyle(3, 0xFFFFFF, 0.9);
@@ -1050,7 +1006,78 @@ export class BattleScene extends Phaser.Scene {
     });
   }
 
+  // One-shot animated explosion (Tiny Swords sheet)
+  _boom(x, y, scale = 0.55) {
+    if (!this.anims.exists('explosion_anim')) return;
+    const b = this.add.sprite(x, y, 'explosions').setDepth(16).setScale(scale);
+    b.play('explosion_anim');
+    b.once('animationcomplete', () => b.destroy());
+    this.cameras.main.shake(90, 0.004);
+  }
+
+  // Short-lived fire pool (Tiny Swords sheet)
+  _firePool(x, y, ms = 1400) {
+    if (!this.anims.exists('fire_anim')) return;
+    const f = this.add.sprite(x, y, 'fire').setDepth(6).setScale(0.55).setAlpha(0.95);
+    f.play('fire_anim');
+    this.time.delayedCall(ms, () => {
+      this.tweens.add({ targets: f, alpha: 0, duration: 300, onComplete: () => f.destroy() });
+    });
+  }
+
   _playAttackFX(charId, fx, fy, tx, ty) {
+    const dxx = tx - fx, dyy = ty - fy;
+    const distT = Math.hypot(dxx, dyy) || 1;
+
+    // ── Imported-sheet projectiles & impacts (the flashy ones) ──────────────
+    if (charId === 'pyro_drake' && this.anims.exists('pyro_drake_proj')) {
+      const p = this.add.sprite(fx, fy, 'pyro_drake_proj').setDepth(14).setScale(1.3);
+      p.play('pyro_drake_proj');
+      p.setRotation(Math.atan2(dyy, dxx));
+      this.tweens.add({
+        targets: p, x: tx, y: ty, duration: Math.min(distT * 1.0, 380), ease: 'Linear',
+        onComplete: () => {
+          p.destroy();
+          if (this.anims.exists('pyro_drake_boom')) {
+            const b = this.add.sprite(tx, ty, 'pyro_drake_boom').setDepth(16).setScale(1.4);
+            b.play('pyro_drake_boom');
+            b.once('animationcomplete', () => b.destroy());
+          }
+        }
+      });
+      return;
+    }
+    if ((charId === 'arrow_jack' || charId === 'volt_ranger')) {
+      const key = charId === 'arrow_jack' && this.textures.exists('arrow_jack_proj')
+        ? 'arrow_jack_proj' : (this.textures.exists('ts_arrow') ? 'ts_arrow' : null);
+      if (key) {
+        const p = this.add.image(fx, fy, key).setDepth(14);
+        p.setScale(key === 'ts_arrow' ? 0.5 : 1.6);
+        if (charId === 'volt_ranger') p.setTint(0xFFE066);
+        // ts_arrow points down; pack arrow points right
+        p.setRotation(Math.atan2(dyy, dxx) + (key === 'ts_arrow' ? -Math.PI / 2 : 0));
+        this.tweens.add({ targets: p, x: tx, y: ty, duration: Math.min(distT * 0.85, 320), ease: 'Linear', onComplete: () => p.destroy() });
+        return;
+      }
+    }
+    if ((charId === 'skywing' || charId === 'forge_dwarf') && this.anims.exists('dynamite_anim')) {
+      const p = this.add.sprite(fx, fy, 'dynamite').setDepth(14).setScale(0.8);
+      p.play('dynamite_anim');
+      this.tweens.add({ targets: p, x: tx, duration: Math.min(distT * 1.1, 420), ease: 'Linear' });
+      this.tweens.add({
+        targets: p, y: ty, duration: Math.min(distT * 1.1, 420), ease: 'Quad.easeIn',
+        onComplete: () => { p.destroy(); this._boom(tx, ty, 0.6); }
+      });
+      return;
+    }
+    if (charId === 'titan_grunt' || charId === 'stone_golem') {
+      this.time.delayedCall(140, () => this._boom(tx, ty, 0.5));
+      // fall through to the melee slash below as well
+    }
+    if (charId === 'blaze_witch') {
+      this.time.delayedCall(200, () => this._firePool(tx, ty));
+    }
+
     const g = this.add.graphics().setDepth(14);
     const dx = tx - fx, dy = ty - fy;
     const dist = Math.sqrt(dx * dx + dy * dy) || 1;
