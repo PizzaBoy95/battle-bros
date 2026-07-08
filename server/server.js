@@ -31,7 +31,9 @@ const io = new Server(server, {
 });
 
 // ── Routes ────────────────────────────────────────────────────────────────────
+app.set('io', io);                       // routes can broadcast (global chat)
 app.use('/auth', authRoutes);
+app.use('/clans', require('./src/clans/routes'));
 
 app.get('/health', (_, res) => res.json({ status: 'ok', time: Date.now() }));
 

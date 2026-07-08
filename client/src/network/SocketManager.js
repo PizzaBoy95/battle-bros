@@ -39,7 +39,7 @@ class SocketManager {
       'overtime_start', 'sudden_death_start',
       'unit_deployed',
       'friend_invite', 'invite_sent', 'invite_error', 'invite_declined',
-      'chat_message'
+      'chat_message', 'global_msg'
     ];
     for (const evt of GAME_EVENTS) {
       this.socket.on(evt, (data) => this._emit(evt, data));

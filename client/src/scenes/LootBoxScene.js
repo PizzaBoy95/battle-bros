@@ -331,6 +331,29 @@ export class LootBoxScene extends Phaser.Scene {
       this.tweens.add({ targets: goldText, alpha: 1, y: goldText.y - 8, duration: 380, ease: 'Sine.easeOut' });
     });
 
+    // Global Chat Scroll drop — a physical scroll swings in
+    if (this.reward.scrolls > 0) {
+      const sc = this.add.container(W / 2 - (this.reward.charReward ? 110 : 0), H * 0.51)
+        .setDepth(15).setAlpha(0).setScale(0.3);
+      const sg = this.add.graphics();
+      sg.fillStyle(0xE8D5A0, 1); sg.fillRoundedRect(-30, -22, 60, 44, 6);
+      sg.fillStyle(0xC9B078, 1); sg.fillRect(-34, -26, 68, 9); sg.fillRect(-34, 17, 68, 9);
+      sg.lineStyle(2, 0x8A6A3A, 1); sg.strokeRoundedRect(-34, -26, 68, 52, 7);
+      sg.lineStyle(1.5, 0xAA8A50, 0.8);
+      sg.lineBetween(-20, -10, 20, -10); sg.lineBetween(-20, 0, 20, 0); sg.lineBetween(-20, 10, 8, 10);
+      sc.add(sg);
+      sc.add(this.add.text(0, 36, 'GLOBAL CHAT SCROLL', {
+        fontSize: '9px', fill: '#E8D5A0', fontFamily: 'Arial Black, Arial', fontStyle: 'bold'
+      }).setOrigin(0.5));
+      sc.add(this.add.text(26, -26, '+1', {
+        fontSize: '13px', fill: '#44FF88', fontFamily: 'Arial Black, Arial', fontStyle: 'bold', stroke: '#000', strokeThickness: 3
+      }).setOrigin(0.5));
+      this.time.delayedCall(520, () => {
+        this.tweens.add({ targets: sc, alpha: 1, scaleX: 1, scaleY: 1, duration: 420, ease: 'Back.easeOut' });
+        this.tweens.add({ targets: sc, angle: -4, duration: 1300, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 450 });
+      });
+    }
+
     // Character card reward — a real physical card with the hero's portrait
     if (this.reward.charReward) {
       const id = this.reward.charReward;
@@ -485,6 +508,14 @@ export class LootBoxScene extends Phaser.Scene {
         const data = await res.json();
         this.registry.set('gold', data.gold);
         localStorage.setItem('bb_gold', String(data.gold));
+      }
+      // Bank any Chat Scrolls that dropped
+      if (this.reward.scrolls > 0) {
+        await fetch('/clans/items/grant', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${token}` },
+          body: JSON.stringify({ qty: this.reward.scrolls })
+        });
       }
     } catch (e) { console.warn('Could not claim reward:', e); }
   }

@@ -34,7 +34,11 @@ export function rollReward(rarity) {
     charReward = eligible[Math.floor(Math.random() * eligible.length)] || null;
   }
 
-  return { rarity, gold, charReward };
+  // Global Chat Scroll drop — rarer chests carry them more often
+  const scrollChance = { common: 0.10, rare: 0.30, epic: 0.60, legendary: 1.0 }[rarity] || 0;
+  const scrolls = Math.random() < scrollChance ? 1 : 0;
+
+  return { rarity, gold, charReward, scrolls };
 }
 
 // Loss reward (smaller)

@@ -12,6 +12,17 @@ export class ResultsScene extends Phaser.Scene {
     this.damage    = data?.damage || 0;
     this.deck      = data?.deck   || [];
     this.lootReward = this.won ? rollReward(rollRarity()) : rollLossReward();
+
+    // Siege War: report crowns earned this battle as clan siege points
+    const myCrowns = this.crowns?.[this.myKey] ?? 0;
+    if (myCrowns > 0) {
+      const token = localStorage.getItem('bb_token');
+      fetch('/clans/war/report', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        body: JSON.stringify({ crowns: myCrowns })
+      }).catch(() => {});
+    }
   }
 
   create() {

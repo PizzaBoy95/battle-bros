@@ -467,7 +467,7 @@ export class MainMenuScene extends Phaser.Scene {
 
     const items = [
       { icon:'🏠', label:'HOME',     x:W*0.10, fn:()=>this._closePanel() },
-      { icon:'👥', label:'SOCIAL',   x:W*0.30, fn:()=>this._openPanel('social') },
+      { icon:'🏰', label:'CLAN',     x:W*0.30, fn:()=>this._openPanel('social') },
       { icon:'🏪', label:'SHOP',     x:W*0.50, fn:()=>this._openPanel('shop') },
       { icon:'📊', label:'STATS',    x:W*0.70, fn:()=>this._openPanel('stats') },
       { icon:'⚙️', label:'SETTINGS', x:W*0.90, fn:()=>this._openPanel('settings') },
@@ -509,6 +509,7 @@ export class MainMenuScene extends Phaser.Scene {
     this._activePanel = name;
     panel.setVisible(true).setAlpha(0);
     this.tweens.add({ targets: panel, alpha:1, y: panel._targetY, duration:280, ease:'Power2' });
+    if (name === 'social') this._refreshClan();   // pull fresh clan data
   }
 
   _closePanel() {
@@ -550,55 +551,194 @@ export class MainMenuScene extends Phaser.Scene {
     return panel;
   }
 
-  // ── SOCIAL PANEL ─────────────────────────────────────────────────────────
+  // ── CLAN PANEL (My Clan · Find · Global Scroll chat) ──────────────────────
   _buildSocialPanel() {
     const { W } = this;
-    const panel = this._makePanel(420);
+    const panel = this._makePanel(560);
     this._panels.social = panel;
+    this._clanTab = 'mine';
 
-    const title = this.add.text(W/2,32,'👥  SOCIAL',{fontSize:'18px',fill:'#44FF88',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5);
+    const title = this.add.text(W/2,28,'🏰  CLANS',{fontSize:'22px',fill:'#44FF88',fontFamily:'Arial Black, Arial',fontStyle:'bold',stroke:'#000',strokeThickness:3}).setOrigin(0.5);
+    panel.add(title);
 
-    // Friend list (mock)
-    const friends = [
-      { name:'BladeKing99', trophies:2840, status:'online' },
-      { name:'DragonSlayer', trophies:1920, status:'in-game' },
-      { name:'IceQueen_X', trophies:3100, status:'online' },
-      { name:'ThunderBolt42', trophies:1540, status:'offline' },
-      { name:'NightRaider', trophies:2200, status:'offline' },
-    ];
-
-    const listY = 58;
-    friends.forEach((f,i) => {
-      const y = listY + i*60;
-      const row = this.add.graphics();
-      row.fillStyle(0x0a1e14,0.8); row.fillRoundedRect(10,y,W-20,52,8);
-      row.lineStyle(1,f.status==='online'?0x44FF88:f.status==='in-game'?0xFF8800:0x334455,0.5);
-      row.strokeRoundedRect(10,y,W-20,52,8);
-      const statusColor = f.status==='online'?'#44FF88':f.status==='in-game'?'#FF8800':'#445566';
-      const statusDot = this.add.graphics();
-      statusDot.fillStyle(f.status==='online'?0x44FF88:f.status==='in-game'?0xFF8800:0x445566,0.9);
-      statusDot.fillCircle(28,y+26,6);
-      const nameT = this.add.text(42,y+10,f.name,{fontSize:'14px',fill:'#FFFFFF',fontFamily:'Arial',fontStyle:'bold'});
-      const subT = this.add.text(42,y+30,'🏆 '+f.trophies+'   '+f.status,{fontSize:'10px',fill:statusColor,fontFamily:'Arial'});
-      // Invite button
-      if (f.status !== 'offline') {
-        const invBg = this.add.graphics();
-        invBg.fillStyle(0xFF4400); invBg.fillRoundedRect(W-80,y+12,64,28,6);
-        const invBtn = this.add.text(W-48,y+26,'INVITE',{fontSize:'11px',fill:'#FFFFFF',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5).setInteractive({useHandCursor:true});
-        invBtn.on('pointerdown',()=>this._flashMsg('Invite sent to '+f.name+'!'));
-        panel.add([invBg,invBtn]);
-      }
-      panel.add([row,statusDot,nameT,subT]);
+    // Sub-tabs
+    const tabs = [['mine','🏰 MY CLAN'],['find','🔎 FIND'],['global','📜 GLOBAL']];
+    this._clanTabObjs = [];
+    tabs.forEach(([key,label],i) => {
+      const x = 14 + i*((W-28)/3), tw2 = (W-28)/3 - 6;
+      const g = this.add.graphics();
+      const t = this.add.text(x+tw2/2, 63, label, {fontSize:'12px', fill:'#9FB2D8', fontFamily:'Arial Black, Arial', fontStyle:'bold'}).setOrigin(0.5);
+      const z = this.add.zone(x+tw2/2, 63, tw2, 34).setOrigin(0.5).setInteractive({useHandCursor:true});
+      z.on('pointerdown', () => { audioSystem.playClick(); this._clanTab = key; this._refreshClan(); });
+      panel.add([g,t,z]);
+      this._clanTabObjs.push({ key, g, t, x, tw2 });
     });
 
-    // Add friend input
-    const addY = listY + friends.length*60 + 12;
-    const addBg = this.add.graphics();
-    addBg.fillStyle(0x0a1e14); addBg.fillRoundedRect(10,addY,W-20,48,8);
-    addBg.lineStyle(1,0x2a5a3a,0.6); addBg.strokeRoundedRect(10,addY,W-20,48,8);
-    const addLabel = this.add.text(W/2,addY+24,'＋  INVITE FRIEND BY USERNAME',{fontSize:'13px',fill:'#44FF88',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(0.5).setInteractive({useHandCursor:true});
-    addLabel.on('pointerdown',()=>this._flashMsg('Feature: enter username to invite'));
-    panel.add([addBg,addLabel,title]);
+    // Dynamic content container
+    this._clanContent = this.add.container(0, 0);
+    panel.add(this._clanContent);
+
+    // Live global chat updates
+    socketManager.on?.('global_msg', () => {
+      if (this._activePanel === 'social' && this._clanTab === 'global') this._refreshClan();
+    });
+  }
+
+  async _capi(path, body) {
+    const token = this.registry.get('token') || localStorage.getItem('bb_token');
+    const res = await fetch(path, {
+      method: body ? 'POST' : 'GET',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+      body: body ? JSON.stringify(body) : undefined
+    });
+    return res.json().catch(() => ({}));
+  }
+
+  async _refreshClan() {
+    // Tab highlight
+    for (const o of this._clanTabObjs) {
+      const on = o.key === this._clanTab;
+      o.g.clear();
+      o.g.fillStyle(on ? 0x1E5A38 : 0x0d1730, 0.95); o.g.fillRoundedRect(o.x, 46, o.tw2, 34, 9);
+      o.g.lineStyle(1.5, on ? 0x44FF88 : 0x2a3a5a, 0.9); o.g.strokeRoundedRect(o.x, 46, o.tw2, 34, 9);
+      o.t.setColor(on ? '#FFFFFF' : '#9FB2D8');
+    }
+    this._clanContent.removeAll(true);
+    const { W } = this;
+    const C = this._clanContent;
+    const txt  = (x,y,s,st) => { const t = this.add.text(x,y,s,st); C.add(t); return t; };
+    const box  = (x,y,w,h,col,a=0.95) => { const g = this.add.graphics(); g.fillStyle(0x0d1730,a); g.fillRoundedRect(x,y,w,h,10); g.lineStyle(1.5,col,0.7); g.strokeRoundedRect(x,y,w,h,10); C.add(g); return g; };
+    const btn  = (x,y,w,h,label,col,cb) => {
+      const g = this.add.graphics();
+      g.fillStyle(col,0.92); g.fillRoundedRect(x,y,w,h,9);
+      g.fillStyle(0xFFFFFF,0.15); g.fillRoundedRect(x+2,y+2,w-4,h*0.4,7);
+      const t = this.add.text(x+w/2,y+h/2,label,{fontSize:'13px',fill:'#FFFFFF',fontFamily:'Arial Black, Arial',fontStyle:'bold',stroke:'#000',strokeThickness:2}).setOrigin(0.5);
+      const z = this.add.zone(x+w/2,y+h/2,w+8,h+8).setOrigin(0.5).setInteractive({useHandCursor:true});
+      z.on('pointerdown',()=>{ audioSystem.playClick(); cb(); });
+      C.add([g,t,z]);
+    };
+    const Y = 94;
+
+    if (this._clanTab === 'mine') {
+      const d = await this._capi('/clans/mine');
+      if (!d.clan) {
+        txt(W/2, Y+40, 'You are not in a clan yet.', {fontSize:'15px',fill:'#AFC4E0',fontFamily:'Arial'}).setOrigin(0.5);
+        txt(W/2, Y+64, 'Join one, or found your own for 1000 gold.', {fontSize:'12px',fill:'#7A93C4',fontFamily:'Arial'}).setOrigin(0.5);
+        btn(W/2-150, Y+95, 140, 44, '➕ CREATE (1000🪙)', 0x2E9E6B, async () => {
+          const name = window.prompt('Clan name (3-24 chars):');
+          if (!name) return;
+          const r = await this._capi('/clans/create', { name });
+          this._flashMsg(r.error || 'Clan founded! 🏰'); this._refreshClan();
+        });
+        btn(W/2+10, Y+95, 140, 44, '🔎 FIND A CLAN', 0x3366CC, () => { this._clanTab='find'; this._refreshClan(); });
+        return;
+      }
+      // Header
+      box(12, Y, W-24, 54, 0x44FF88);
+      txt(24, Y+9, `${d.clan.badge}  ${d.clan.name}`, {fontSize:'17px',fill:'#FFFFFF',fontFamily:'Arial Black, Arial',fontStyle:'bold'});
+      txt(24, Y+33, `👥 ${d.members.length}/${d.maxMembers}   ·   ⚔ ${d.clan.war_wins} war wins   ·   you: ${d.clan.role}`, {fontSize:'11px',fill:'#9FB2D8',fontFamily:'Arial'});
+      // War block
+      const wy = Y+62;
+      if (d.war && d.war.state === 'active') {
+        box(12, wy, W-24, 74, 0xD9A21B);
+        txt(24, wy+8, `⚔ SIEGE WAR vs ${d.war.rival}`, {fontSize:'13px',fill:'#FFD700',fontFamily:'Arial Black, Arial',fontStyle:'bold'});
+        const hrs = Math.max(0, Math.round((d.war.ends_at - Date.now()/1000)/360)/10);
+        txt(W-24, wy+8, `${hrs}h left`, {fontSize:'11px',fill:'#C9B577',fontFamily:'Arial'}).setOrigin(1,0);
+        // score bars
+        const bw2 = W-72, bx = 24;
+        const bars = this.add.graphics(); C.add(bars);
+        bars.fillStyle(0x1a2440); bars.fillRoundedRect(bx, wy+30, bw2, 10, 5);
+        bars.fillStyle(0x44FF88); bars.fillRoundedRect(bx, wy+30, Math.max(4, bw2*Math.min(1,d.war.our_score/d.war.goal)), 10, 5);
+        bars.fillStyle(0x1a2440); bars.fillRoundedRect(bx, wy+48, bw2, 10, 5);
+        bars.fillStyle(0xE05C2A); bars.fillRoundedRect(bx, wy+48, Math.max(4, bw2*Math.min(1,d.war.their_score/d.war.goal)), 10, 5);
+        txt(W-24, wy+27, `US ${d.war.our_score}`, {fontSize:'10px',fill:'#44FF88',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(1,0);
+        txt(W-24, wy+45, `${d.war.rival} ${d.war.their_score}`, {fontSize:'10px',fill:'#E88A6A',fontFamily:'Arial',fontStyle:'bold'}).setOrigin(1,0);
+        txt(24, wy+60, `First to ${d.war.goal}! Crowns you win in battle = siege points · pot ${d.war.pot_gold}🪙`, {fontSize:'9px',fill:'#8FA4D8',fontFamily:'Arial'});
+      } else if (d.war && (d.war.state === 'won' || d.war.state === 'lost')) {
+        box(12, wy, W-24, 40, d.war.state === 'won' ? 0x44FF88 : 0xE05C2A);
+        txt(W/2, wy+20, d.war.state === 'won' ? `🏆 WAR WON vs ${d.war.rival} — gold paid out!` : `💀 War lost vs ${d.war.rival}...`,
+          {fontSize:'13px',fill: d.war.state==='won' ? '#44FF88' : '#E88A6A',fontFamily:'Arial Black, Arial',fontStyle:'bold'}).setOrigin(0.5);
+        btn(W/2-70, wy+48, 140, 34, '⚔ NEW WAR', 0xB8341B, async () => {
+          const r = await this._capi('/clans/war/start', {});
+          this._flashMsg(r.error || 'Siege War started!'); this._refreshClan();
+        });
+      } else {
+        btn(24, wy, W-48, 40, '⚔ START SIEGE WAR (24h)', 0xB8341B, async () => {
+          const r = await this._capi('/clans/war/start', {});
+          this._flashMsg(r.error || 'Siege War started!'); this._refreshClan();
+        });
+      }
+      // Members (top 6 by wins)
+      const my2 = wy + (d.war && d.war.state === 'active' ? 82 : (d.war ? 92 : 48));
+      txt(24, my2, 'MEMBERS', {fontSize:'10px',fill:'#7A93C4',fontFamily:'Arial Black, Arial',fontStyle:'bold'});
+      d.members.slice(0, 6).forEach((m, i) => {
+        const yy = my2 + 16 + i*22;
+        txt(24, yy, `${m.role==='leader'?'👑':'•'} ${m.username}`, {fontSize:'12px',fill:'#FFFFFF',fontFamily:'Arial'});
+        txt(W-24, yy, `${m.wins || 0} wins`, {fontSize:'11px',fill:'#9FB2D8',fontFamily:'Arial'}).setOrigin(1,0);
+      });
+      if (d.members.length > 6) txt(24, my2+16+6*22, `…and ${d.members.length-6} more`, {fontSize:'10px',fill:'#7A93C4',fontFamily:'Arial'});
+      // Chat (last 4)
+      const cy2 = my2 + 16 + Math.min(6, d.members.length)*22 + (d.members.length>6?18:6);
+      txt(24, cy2, 'CLAN CHAT', {fontSize:'10px',fill:'#7A93C4',fontFamily:'Arial Black, Arial',fontStyle:'bold'});
+      d.chat.slice(-4).forEach((c, i) => {
+        txt(24, cy2+16+i*18, `${c.username}: ${c.message}`.slice(0, 52), {fontSize:'11px',fill:'#CFE0FF',fontFamily:'Arial'});
+      });
+      btn(24, 466, (W-58)/2, 38, '✍ SEND MESSAGE', 0x3366CC, async () => {
+        const m = window.prompt('Message to your clan:');
+        if (!m) return;
+        await this._capi('/clans/chat', { message: m }); this._refreshClan();
+      });
+      btn(34 + (W-58)/2, 466, (W-58)/2, 38, '🚪 LEAVE CLAN', 0x8A2A2A, async () => {
+        if (!window.confirm('Leave this clan?')) return;
+        await this._capi('/clans/leave', {}); this._refreshClan();
+      });
+
+    } else if (this._clanTab === 'find') {
+      const d = await this._capi('/clans');
+      btn(24, Y, W-48, 40, '➕ CREATE YOUR OWN CLAN (1000🪙)', 0x2E9E6B, async () => {
+        const name = window.prompt('Clan name (3-24 chars):');
+        if (!name) return;
+        const r = await this._capi('/clans/create', { name });
+        this._flashMsg(r.error || 'Clan founded! 🏰');
+        if (!r.error) { this._clanTab='mine'; } this._refreshClan();
+      });
+      if (!d.clans?.length) txt(W/2, Y+90, 'No clans yet — be the first founder!', {fontSize:'13px',fill:'#9FB2D8',fontFamily:'Arial'}).setOrigin(0.5);
+      (d.clans || []).slice(0, 6).forEach((c, i) => {
+        const yy = Y + 52 + i*58;
+        box(12, yy, W-24, 50, 0x3366CC, 0.9);
+        txt(24, yy+8, `${c.badge}  ${c.name}`, {fontSize:'14px',fill:'#FFFFFF',fontFamily:'Arial Black, Arial',fontStyle:'bold'});
+        txt(24, yy+29, `👥 ${c.members}/35 · ⚔ ${c.war_wins} war wins`, {fontSize:'10px',fill:'#9FB2D8',fontFamily:'Arial'});
+        if (!d.mine && c.members < 35) {
+          btn(W-96, yy+9, 72, 32, 'JOIN', 0x2E9E6B, async () => {
+            const r = await this._capi('/clans/join', { clanId: c.id });
+            this._flashMsg(r.error || `Joined ${c.name}! 🏰`);
+            if (!r.error) this._clanTab = 'mine';
+            this._refreshClan();
+          });
+        }
+      });
+
+    } else { // global scroll chat
+      const d = await this._capi('/clans/global');
+      box(12, Y, W-24, 46, 0xC9B078);
+      txt(24, Y+14, `📜 Chat Scrolls: ${d.scrolls ?? 0}`, {fontSize:'14px',fill:'#E8D5A0',fontFamily:'Arial Black, Arial',fontStyle:'bold'});
+      btn(W-160, Y+7, 136, 32, '📜 POST GLOBAL', 0xB8862A, async () => {
+        if (!(d.scrolls > 0)) { this._flashMsg('No scrolls! Win them in loot chests.'); return; }
+        const m = window.prompt('Your GLOBAL message (everyone sees it!):');
+        if (!m) return;
+        const r = await this._capi('/clans/global', { message: m });
+        this._flashMsg(r.error || 'Message sent to the whole realm! 📜');
+        this._refreshClan();
+      });
+      txt(24, Y+56, 'REALM FEED — recruit for your clan here!', {fontSize:'10px',fill:'#7A93C4',fontFamily:'Arial Black, Arial',fontStyle:'bold'});
+      const msgs = (d.messages || []).slice(-11);
+      if (!msgs.length) txt(W/2, Y+110, 'No messages yet. Be the first voice in the realm!', {fontSize:'12px',fill:'#9FB2D8',fontFamily:'Arial'}).setOrigin(0.5);
+      msgs.forEach((m, i) => {
+        const yy = Y + 74 + i*30;
+        txt(24, yy, `${m.username}${m.clan_name ? ' ['+m.clan_name+']' : ''}`, {fontSize:'11px',fill:'#FFD700',fontFamily:'Arial',fontStyle:'bold'});
+        txt(24, yy+13, m.message.slice(0, 58), {fontSize:'11px',fill:'#CFE0FF',fontFamily:'Arial'});
+      });
+    }
   }
 
   // ── SHOP PANEL ────────────────────────────────────────────────────────────
@@ -617,6 +757,7 @@ export class MainMenuScene extends Phaser.Scene {
       { icon:'🃏',  name:'Card Pack (x5)',  desc:'5 random character cards',     cost:800,  gem:false, color:0xCC8800 },
       { icon:'💎',  name:'Gem Bundle x50',  desc:'50 Gems added to account',     cost:250,  gem:true,  color:0xAA33CC },
       { icon:'🔓',  name:'Unlock Slot',     desc:'Unlock 1 mystery character',   cost:1500, gem:false, color:0x55AA33 },
+      { icon:'📜',  name:'Chat Scroll',     desc:'Post 1 message to GLOBAL chat', cost:400, gem:false, scroll:true, color:0xC9B078 },
     ];
 
     // ── One large row per item, in a scrollable masked list ─────────────────
@@ -653,7 +794,15 @@ export class MainMenuScene extends Phaser.Scene {
       const buyZone = this.add.zone(pxx + pw / 2, pyy + ph2 / 2, pw + 14, ph2 + 14).setOrigin(0.5).setInteractive({ useHandCursor: true });
       buyZone.on('pointerover', () => costLabel.setScale(1.08));
       buyZone.on('pointerout',  () => costLabel.setScale(1));
-      buyZone.on('pointerdown', () => {
+      buyZone.on('pointerdown', async () => {
+        if (item.scroll) {
+          // Real server purchase — banks a Global Chat Scroll
+          const r = await this._capi('/clans/items/buy', {});
+          if (r.error) return this._flashMsg(r.error);
+          this.gold = r.gold; localStorage.setItem('bb_gold', String(r.gold));
+          audioSystem.playClick();
+          return this._flashMsg('Chat Scroll added! 📜 (see CLAN → GLOBAL)');
+        }
         if (this.gold >= item.cost || item.gem) {
           if (!item.gem) { this.gold -= item.cost; localStorage.setItem('bb_gold', String(this.gold)); }
           audioSystem.playClick();

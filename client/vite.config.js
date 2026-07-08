@@ -5,7 +5,8 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/auth': 'http://localhost:3001',
-      '/api':  'http://localhost:3001'
+      '/api':  'http://localhost:3001',
+      '/clans': 'http://localhost:3001'
     }
   },
   build: {
